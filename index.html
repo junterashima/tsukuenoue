@@ -108,7 +108,7 @@
     @keyframes shake { 0% { transform: rotate(0deg); } 25% { transform: rotate(5deg); } 50% { transform: rotate(0deg); } 75% { transform: rotate(-5deg); } 100% { transform: rotate(0deg); } }
     .animate-shake { animation: shake 0.4s infinite; }
 
-    /* Golf UI - クリック透過設定 (修正後: ボタンのみクリッカブルに) */
+    /* Golf UI - クリック透過修正 */
     #golf-ui { pointer-events: none; }
     #golf-ui .pointer-events-auto { pointer-events: auto; }
   </style>
@@ -359,9 +359,9 @@
             
             <!-- UI (クリック透過設定済み) -->
             <div id="golf-ui" class="absolute top-6 right-6 w-64 bg-white/65 backdrop-blur-xl p-6 rounded-3xl shadow-lg border border-white/30 z-20 transition-all duration-300 pointer-events-none origin-top-right">
-                <div class="w-full relative"> <!-- ここは auto にしない -->
-                    <!-- トグルボタン: ここは auto -->
-                    <button onclick="toggleGolfUi()" class="pointer-events-auto absolute -top-2 -right-2 p-2 text-slate-400 hover:text-slate-600 transition-colors z-50 rounded-full hover:bg-white/50" title="切り替え">
+                <div class="pointer-events-auto w-full relative"> 
+                    <!-- トグルボタン -->
+                    <button onclick="toggleGolfUi()" class="absolute -top-2 -right-2 p-2 text-slate-400 hover:text-slate-600 transition-colors z-50 rounded-full hover:bg-white/50" title="切り替え">
                         <span id="golf-toggle-icon" class="material-symbols-rounded text-xl">expand_less</span>
                     </button>
                     <!-- フル表示 -->
@@ -371,7 +371,7 @@
                         <div class="flex justify-between text-sm text-slate-800 mb-2"><span>打数</span><span class="font-semibold"><span id="golf-shots">0</span> <span class="text-slate-500 font-normal ml-1">(Par <span id="golf-par">3</span>)</span></span></div>
                         <div class="flex justify-between text-sm text-slate-800 mb-4"><span>スコア</span><span class="font-semibold" id="golf-score">0</span></div>
                         <p class="text-xs text-slate-500 text-center leading-relaxed mb-4">フォルダをドラッグして飛ばし<br>ゴミ箱に入れればクリアです</p>
-                        <button onclick="golfGame.resetLevel()" class="pointer-events-auto w-full bg-[#007AFF] hover:bg-[#0062cc] text-white font-semibold py-2.5 rounded-xl text-sm transition-all shadow-md active:scale-95">やり直す</button>
+                        <button onclick="golfGame.resetLevel()" class="w-full bg-[#007AFF] hover:bg-[#0062cc] text-white font-semibold py-2.5 rounded-xl text-sm transition-all shadow-md active:scale-95 pointer-events-auto">やり直す</button>
                         <div class="mt-4 pt-4 border-t border-slate-200/50 text-center"><p class="text-[10px] text-slate-400">Escキーでボスモード（隠す）</p></div>
                     </div>
                     <!-- ミニ表示 (さらに小さく) -->
@@ -531,7 +531,7 @@
     let gameWon = false;
 
     const TOOLS = {
-      home: { title: "ツクエノウエ", desc: "便利ツール集" },
+      home: { title: "ダッシュボード", desc: "便利ツール集" },
       palette: { title: "配色抽出", desc: "画像からドミナントカラーを抽出" },
       pdf: { title: "PDF工房", desc: "PDFの結合・分割・回転・削除" },
       exif: { title: "写真情報(Exif)削除", desc: "写真の位置情報を削除してプライバシー保護" },
@@ -1326,6 +1326,7 @@
             const cy = h / 2;
             this.obstacles = [];
 
+            // Simple level generation
             switch(lvl) {
                 case 1:
                     this.player.x = w * 0.2; this.player.y = cy;
@@ -1356,6 +1357,17 @@
                      this.obstacles.push({ x: w*0.3, y: h*0.2, w: 20, h: h*0.6, type: 'wall' });
                      this.obstacles.push({ x: w*0.6, y: h*0.2, w: 20, h: h*0.6, type: 'wall' });
                      break;
+                
+                // Add Case 5 for smooth progression
+                case 5:
+                     this.player.x = 100; this.player.y = cy;
+                     this.goal.x = w - 100; this.goal.y = cy;
+                     this.goal.par = 4;
+                     // 上下に動く壁
+                     this.obstacles.push({ x: cx - 20, y: 0, w: 40, h: 100, type: 'wall', moveY: 2, rangeY: [0, h/2 - 100] });
+                     this.obstacles.push({ x: cx - 20, y: h-100, w: 40, h: 100, type: 'wall', moveY: -2, rangeY: [h/2 + 100, h] });
+                     break;
+
                 // High level difficulty
                 case 6:
                      this.player.x = 100; this.player.y = cy;
@@ -1370,9 +1382,18 @@
                      this.obstacles.push({ x: w*0.3, y: 0, w: 20, h: h*0.5, type: 'wall', moveY: 2, rangeY: [0, h*0.5] });
                      this.obstacles.push({ x: w*0.6, y: h*0.5, w: 20, h: h*0.5, type: 'wall', moveY: -2, rangeY: [0, h*0.5] });
                      break;
+
+                // Additional cases to fill gap
+                case 8:
+                     this.player.x = 80; this.player.y = 80;
+                     this.goal.x = w - 80; this.goal.y = h - 80;
+                     this.goal.par = 5;
+                     this.obstacles.push({ x: cx - 100, y: cy - 10, w: 200, h: 20, type: 'wall' });
+                     this.obstacles.push({ x: cx - 10, y: cy - 100, w: 20, h: 200, type: 'wall' });
+                     break;
                 
                 default:
-                    // Random generation
+                    // Random generation fallback
                     this.player.x = 100; this.player.y = 100;
                     this.goal.x = w - 100; this.goal.y = h - 100;
                     this.goal.par = 4;
@@ -1391,7 +1412,7 @@
             
             // UIエリア除外: ゴールが右上にある場合は位置をずらす
             if (this.goal.x > w - 300 && this.goal.y < 300) {
-                this.goal.y = 350; // ずらす
+                this.goal.y = 350; 
             }
             
             this.updateUI();
