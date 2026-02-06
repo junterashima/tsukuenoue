@@ -1,0 +1,1596 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ツクエノウエ | ブラウザツール</title>
+  
+  <!-- デザインフレームワーク: Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- フォント: Inter, Noto Sans JP -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+  
+  <!-- アイコン: Material Symbols Rounded -->
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0" />
+
+  <!-- 機能ライブラリ群 (CDN) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/piexifjs/1.0.6/piexif.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/color-thief/2.3.0/color-thief.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js"></script>
+  <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
+
+  <script>
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Inter"', '"Noto Sans JP"', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+          },
+          colors: {
+            base: '#F8FAFC',
+            surface: '#FFFFFF',
+            primary: '#0F172A',
+            accent: '#3B82F6',
+            c_palette: '#EC4899',
+            c_pdf: '#F97316',
+            c_exif: '#8B5CF6',
+            c_resize: '#06B6D4',
+            c_qr: '#10B981',
+            c_pass: '#64748B',
+            c_game: '#6366F1',
+            c_golf: '#007AFF',
+            c_omikuji: '#F43F5E',
+          },
+          boxShadow: {
+            'card': '0 2px 8px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02)',
+            'card-hover': '0 8px 24px rgba(0, 0, 0, 0.08), 0 4px 8px rgba(0, 0, 0, 0.04)',
+            'mac': '0 0 0 1px rgba(0,0,0,0.05), 0 2px 8px rgba(0,0,0,0.1)',
+          },
+          animation: {
+            'gradient-bg': 'gradientBG 15s ease infinite',
+          },
+          keyframes: {
+            gradientBG: {
+              '0%': { backgroundPosition: '0% 50%' },
+              '50%': { backgroundPosition: '100% 50%' },
+              '100%': { backgroundPosition: '0% 50%' },
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    /* Mac-like Scrollbar */
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #C1C1C1; border-radius: 10px; border: 2px solid #F5F5F7; }
+    ::-webkit-scrollbar-thumb:hover { background: #A8A8A8; }
+
+    html, body { height: 100%; margin: 0; padding: 0; overflow: hidden; }
+
+    .fade-in { animation: fadeIn 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+
+    .drag-overlay { background-color: rgba(255, 255, 255, 0.9); backdrop-filter: blur(8px); z-index: 100; }
+    .spinner { border: 3px solid rgba(0, 122, 255, 0.1); width: 24px; height: 24px; border-radius: 50%; border-left-color: #007AFF; animation: spin 0.8s linear infinite; }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+    .nav-btn.active { background-color: rgba(0, 0, 0, 0.05); color: #1D1D1F; }
+    .nav-btn:hover { background-color: rgba(0, 0, 0, 0.03); }
+
+    /* PDF Card */
+    .pdf-page-card { transition: transform 0.2s ease, box-shadow 0.2s ease; cursor: grab; border: 1px solid rgba(0,0,0,0.1); }
+    .pdf-page-card:active { cursor: grabbing; }
+    .pdf-page-card:hover { transform: translateY(-2px); box-shadow: 0 10px 20px -5px rgba(0, 0, 0, 0.1); }
+    .split-start { ring: 3px solid #007AFF; ring-offset: 2px; }
+    
+    /* 2048 Game */
+    .game-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem; background-color: #BBADA0; border-radius: 0.5rem; padding: 0.5rem; width: 300px; height: 300px; position: relative;}
+    .game-cell { background-color: #CDC1B4; border-radius: 0.25rem; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 1.5rem; color: #776E65; transition: all 0.15s ease-in-out; user-select: none; }
+    .tile-2 { background-color: #EEE4DA; } .tile-4 { background-color: #EDE0C8; } .tile-8 { background-color: #F2B179; color: #F9F6F2; }
+    .tile-16 { background-color: #F59563; color: #F9F6F2; } .tile-32 { background-color: #F67C5F; color: #F9F6F2; } .tile-64 { background-color: #F65E3B; color: #F9F6F2; }
+    .tile-128 { background-color: #EDCF72; color: #F9F6F2; font-size: 1.25rem; } .tile-256 { background-color: #EDCC61; color: #F9F6F2; font-size: 1.25rem; }
+    .tile-512 { background-color: #EDC850; color: #F9F6F2; font-size: 1.25rem; } .tile-1024 { background-color: #EDC53F; color: #F9F6F2; font-size: 1rem; }
+    .tile-2048 { background-color: #EDC22E; color: #F9F6F2; font-size: 1rem; box-shadow: 0 0 10px #EDC22E; }
+
+    /* Omikuji Shake */
+    @keyframes shake { 0% { transform: rotate(0deg); } 25% { transform: rotate(5deg); } 50% { transform: rotate(0deg); } 75% { transform: rotate(-5deg); } 100% { transform: rotate(0deg); } }
+    .animate-shake { animation: shake 0.4s infinite; }
+
+    /* Golf UI - クリック透過設定 (修正後: ボタンのみクリッカブルに) */
+    #golf-ui { pointer-events: none; }
+    #golf-ui .pointer-events-auto { pointer-events: auto; }
+  </style>
+</head>
+<body class="bg-base text-primary font-sans h-full w-full flex flex-col md:flex-row antialiased" onpaste="handlePaste(event)">
+
+  <!-- サイドナビゲーション -->
+  <nav class="bg-surface/80 backdrop-blur-md w-full md:w-20 md:h-full h-16 border-r border-slate-200 z-30 flex md:flex-col flex-row items-center justify-between md:justify-start py-4 flex-shrink-0">
+    <div class="md:mb-6 px-4 flex justify-center w-full">
+      <button onclick="switchTab('home')" class="group relative w-12 h-12 flex items-center justify-center rounded-2xl hover:bg-slate-100 transition-all duration-300" title="ホーム">
+        <div class="w-10 h-10 bg-gradient-to-b from-[#00C7FC] to-[#007AFF] rounded-xl flex items-center justify-center shadow-mac group-hover:scale-105 transition-transform">
+           <span class="material-symbols-rounded text-white text-2xl drop-shadow-sm">home</span>
+        </div>
+      </button>
+    </div>
+
+    <div class="flex md:flex-col flex-row gap-2 w-full px-2 overflow-x-auto md:overflow-visible no-scrollbar justify-center items-center">
+      <button onclick="switchTab('palette')" id="nav-palette" class="nav-btn w-10 h-10 flex items-center justify-center rounded-lg text-slate-400 hover:text-c_palette transition-all" title="配色抽出"><span class="material-symbols-rounded text-[24px]">palette</span></button>
+      <button onclick="switchTab('pdf')" id="nav-pdf" class="nav-btn w-10 h-10 flex items-center justify-center rounded-lg text-slate-400 hover:text-c_pdf transition-all" title="PDF工房"><span class="material-symbols-rounded text-[24px]">picture_as_pdf</span></button>
+      <button onclick="switchTab('exif')" id="nav-exif" class="nav-btn w-10 h-10 flex items-center justify-center rounded-lg text-slate-400 hover:text-c_exif transition-all" title="写真情報削除"><span class="material-symbols-rounded text-[24px]">no_photography</span></button>
+      <button onclick="switchTab('resize')" id="nav-resize" class="nav-btn w-10 h-10 flex items-center justify-center rounded-lg text-slate-400 hover:text-c_resize transition-all" title="画像リサイズ"><span class="material-symbols-rounded text-[24px]">photo_size_select_small</span></button>
+      <button onclick="switchTab('qr')" id="nav-qr" class="nav-btn w-10 h-10 flex items-center justify-center rounded-lg text-slate-400 hover:text-c_qr transition-all" title="QR作成"><span class="material-symbols-rounded text-[24px]">qr_code_2</span></button>
+      <button onclick="switchTab('pass')" id="nav-pass" class="nav-btn w-10 h-10 flex items-center justify-center rounded-lg text-slate-400 hover:text-c_pass transition-all" title="パスワード生成"><span class="material-symbols-rounded text-[24px]">lock</span></button>
+      <div class="h-px w-8 bg-slate-200 my-1 hidden md:block"></div>
+      <button onclick="switchTab('game')" id="nav-game" class="nav-btn w-10 h-10 flex items-center justify-center rounded-lg text-slate-400 hover:text-c_game transition-all" title="数字パズル"><span class="material-symbols-rounded text-[24px]">sports_esports</span></button>
+      <button onclick="switchTab('golf')" id="nav-golf" class="nav-btn w-10 h-10 flex items-center justify-center rounded-lg text-slate-400 hover:text-c_golf transition-all" title="机上のゴルフ"><span class="material-symbols-rounded text-[24px]">folder_open</span></button>
+      <button onclick="switchTab('omikuji')" id="nav-omikuji" class="nav-btn w-10 h-10 flex items-center justify-center rounded-lg text-slate-400 hover:text-c_omikuji transition-all" title="おみくじ"><span class="material-symbols-rounded text-[24px]">celebration</span></button>
+    </div>
+    <div class="hidden md:block flex-1"></div>
+  </nav>
+
+  <!-- メインコンテンツ -->
+  <main class="flex-1 h-full min-w-0 relative flex flex-col bg-base">
+    
+    <header class="w-full h-14 border-b border-slate-200 bg-surface/80 backdrop-blur-md sticky top-0 z-20 px-6 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <button id="back-home-btn" onclick="switchTab('home')" class="hidden p-1 rounded-md hover:bg-black/5 text-slate-500 hover:text-slate-800 transition-colors" title="ホームに戻る">
+          <span class="material-symbols-rounded text-xl">arrow_back_ios_new</span>
+        </button>
+        <div class="flex flex-col sm:flex-row sm:items-baseline sm:gap-2">
+            <h1 id="page-title" class="text-base font-semibold text-slate-800 tracking-tight">ツクエノウエ</h1>
+            <span id="page-desc" class="text-xs text-slate-500 font-medium">インストール不要の便利ツール集</span>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <div class="w-1.5 h-1.5 rounded-full bg-emerald-500"></div>
+        <span class="text-[10px] text-slate-400 uppercase tracking-widest font-bold">Local</span>
+      </div>
+    </header>
+
+    <!-- コンテンツコンテナ -->
+    <div class="flex-1 relative w-full h-full overflow-hidden">
+        
+        <!-- 1. 通常ツール用スクロール領域 (ゴルフ以外) -->
+        <div id="standard-view-container" class="absolute inset-0 overflow-y-auto p-6 md:p-8 scroll-smooth z-0">
+          <div class="max-w-6xl mx-auto h-full flex flex-col">
+
+            <!-- 1. ホーム画面 -->
+            <div id="view-home" class="view-section h-full flex flex-col justify-start">
+              <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                <!-- Cards -->
+                <div onclick="switchTab('palette')" class="bg-white p-5 rounded-2xl border border-slate-200 shadow-card hover:shadow-card-hover transition-all cursor-pointer group h-40 flex flex-col justify-between">
+                  <div class="flex items-center gap-4"><div class="w-10 h-10 rounded-xl bg-pink-100 text-pink-500 flex items-center justify-center"><span class="material-symbols-rounded text-2xl">palette</span></div><div><h3 class="font-bold text-slate-800">配色抽出</h3><span class="text-[10px] font-bold text-pink-500 bg-pink-50 px-2 py-0.5 rounded-full">Design</span></div></div><p class="text-xs text-slate-500 line-clamp-2">画像から主要な色（ドミナントカラー）を自動で抽出します。</p></div>
+                <div onclick="switchTab('pdf')" class="bg-white p-5 rounded-2xl border border-slate-200 shadow-card hover:shadow-card-hover transition-all cursor-pointer group h-40 flex flex-col justify-between">
+                  <div class="flex items-center gap-4"><div class="w-10 h-10 rounded-xl bg-orange-100 text-orange-500 flex items-center justify-center"><span class="material-symbols-rounded text-2xl">picture_as_pdf</span></div><div><h3 class="font-bold text-slate-800">PDF工房</h3><span class="text-[10px] font-bold text-orange-500 bg-orange-50 px-2 py-0.5 rounded-full">Document</span></div></div><p class="text-xs text-slate-500 line-clamp-2">PDFの結合・分割・回転・削除がブラウザ上で完結します。</p></div>
+                <div onclick="switchTab('exif')" class="bg-white p-5 rounded-2xl border border-slate-200 shadow-card hover:shadow-card-hover transition-all cursor-pointer group h-40 flex flex-col justify-between">
+                  <div class="flex items-center gap-4"><div class="w-10 h-10 rounded-xl bg-purple-100 text-purple-500 flex items-center justify-center"><span class="material-symbols-rounded text-2xl">no_photography</span></div><div><h3 class="font-bold text-slate-800">写真情報削除</h3><span class="text-[10px] font-bold text-purple-500 bg-purple-50 px-2 py-0.5 rounded-full">Privacy</span></div></div><p class="text-xs text-slate-500 line-clamp-2">写真の位置情報(GPS)や撮影日時を削除してプライバシーを守ります。</p></div>
+                <div onclick="switchTab('resize')" class="bg-white p-5 rounded-2xl border border-slate-200 shadow-card hover:shadow-card-hover transition-all cursor-pointer group h-40 flex flex-col justify-between">
+                  <div class="flex items-center gap-4"><div class="w-10 h-10 rounded-xl bg-cyan-100 text-cyan-500 flex items-center justify-center"><span class="material-symbols-rounded text-2xl">photo_size_select_small</span></div><div><h3 class="font-bold text-slate-800">画像サイズ変更</h3><span class="text-[10px] font-bold text-cyan-500 bg-cyan-50 px-2 py-0.5 rounded-full">Edit</span></div></div><p class="text-xs text-slate-500 line-clamp-2">画像の解像度を指定してリサイズ。Web用に軽量化します。</p></div>
+                <div onclick="switchTab('qr')" class="bg-white p-5 rounded-2xl border border-slate-200 shadow-card hover:shadow-card-hover transition-all cursor-pointer group h-40 flex flex-col justify-between">
+                  <div class="flex items-center gap-4"><div class="w-10 h-10 rounded-xl bg-green-100 text-green-500 flex items-center justify-center"><span class="material-symbols-rounded text-2xl">qr_code_2</span></div><div><h3 class="font-bold text-slate-800">QR作成</h3><span class="text-[10px] font-bold text-green-500 bg-green-50 px-2 py-0.5 rounded-full">Generator</span></div></div><p class="text-xs text-slate-500 line-clamp-2">URLやテキストを瞬時にQRコードに変換します。</p></div>
+                <div onclick="switchTab('pass')" class="bg-white p-5 rounded-2xl border border-slate-200 shadow-card hover:shadow-card-hover transition-all cursor-pointer group h-40 flex flex-col justify-between">
+                  <div class="flex items-center gap-4"><div class="w-10 h-10 rounded-xl bg-slate-100 text-slate-500 flex items-center justify-center"><span class="material-symbols-rounded text-2xl">lock</span></div><div><h3 class="font-bold text-slate-800">パスワード生成</h3><span class="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">Security</span></div></div><p class="text-xs text-slate-500 line-clamp-2">安全なランダムパスワードを生成します。</p></div>
+                <!-- Games -->
+                <div onclick="switchTab('game')" class="bg-white p-5 rounded-2xl border border-slate-200 shadow-card hover:shadow-card-hover transition-all cursor-pointer group h-40 flex flex-col justify-between">
+                  <div class="flex items-center gap-4"><div class="w-10 h-10 rounded-xl bg-indigo-100 text-indigo-500 flex items-center justify-center"><span class="material-symbols-rounded text-2xl">sports_esports</span></div><div><h3 class="font-bold text-slate-800">数字パズル</h3><span class="text-[10px] font-bold text-indigo-500 bg-indigo-50 px-2 py-0.5 rounded-full">Game</span></div></div><p class="text-xs text-slate-500 line-clamp-2">数字を合体させて2048を目指すパズルゲーム。</p></div>
+                <div onclick="switchTab('golf')" class="bg-white p-5 rounded-2xl border border-slate-200 shadow-card hover:shadow-card-hover transition-all cursor-pointer group h-40 flex flex-col justify-between">
+                  <div class="flex items-center gap-4"><div class="w-10 h-10 rounded-xl bg-blue-100 text-blue-500 flex items-center justify-center"><span class="material-symbols-rounded text-2xl">folder_open</span></div><div><h3 class="font-bold text-slate-800">机上のゴルフ</h3><span class="text-[10px] font-bold text-blue-500 bg-blue-50 px-2 py-0.5 rounded-full">Game</span></div></div><p class="text-xs text-slate-500 line-clamp-2">フォルダを飛ばしてゴミ箱に入れる物理アクションゲーム。</p></div>
+                <div onclick="switchTab('omikuji')" class="bg-white p-5 rounded-2xl border border-slate-200 shadow-card hover:shadow-card-hover transition-all cursor-pointer group h-40 flex flex-col justify-between">
+                  <div class="flex items-center gap-4"><div class="w-10 h-10 rounded-xl bg-rose-100 text-rose-500 flex items-center justify-center"><span class="material-symbols-rounded text-2xl">celebration</span></div><div><h3 class="font-bold text-slate-800">デジタルおみくじ</h3><span class="text-[10px] font-bold text-rose-500 bg-rose-50 px-2 py-0.5 rounded-full">Luck</span></div></div><p class="text-xs text-slate-500 line-clamp-2">今日の運勢を占います。ラッキーアイテムもチェック。</p></div>
+              </div>
+            </div>
+
+            <!-- 2. PDF工房 -->
+            <div id="view-pdf" class="view-section hidden h-full fade-in flex flex-col">
+              <div class="flex-1 flex flex-col items-center justify-center border-2 border-dashed border-slate-300 rounded-3xl p-10 bg-white/50 hover:bg-orange-50/50 hover:border-orange-300 transition-colors cursor-pointer relative" id="pdf-dropzone">
+                <input type="file" id="pdf-input" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" accept=".pdf" multiple>
+                <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-orange-400 to-orange-500 text-white flex items-center justify-center mb-4 shadow-lg shadow-orange-200"><span class="material-symbols-rounded text-3xl">picture_as_pdf</span></div>
+                <h3 class="text-lg font-bold text-slate-700">PDFファイルをドロップ</h3>
+                <p class="text-slate-400 text-xs mt-2">複数ファイルの結合・分割・編集</p>
+              </div>
+              <div id="pdf-ui" class="hidden h-full flex flex-col">
+                <div class="flex flex-col sm:flex-row justify-between items-center mb-4 gap-4 p-4 bg-white rounded-xl border border-slate-200 shadow-sm">
+                  <div class="flex gap-2">
+                    <label class="cursor-pointer bg-slate-50 text-slate-700 px-4 py-2 rounded-lg font-semibold hover:bg-slate-100 transition-colors text-xs flex items-center gap-2 border border-slate-200">
+                      <span class="material-symbols-rounded text-sm">add</span> 追加 <input type="file" id="pdf-add-input" class="hidden" accept=".pdf" multiple onchange="handlePdfAdd(this)">
+                    </label>
+                    <button onclick="resetPdf()" class="text-red-500 px-4 py-2 rounded-lg font-semibold hover:bg-red-50 transition-colors text-xs flex items-center gap-2"><span class="material-symbols-rounded text-sm">delete</span> 全消去</button>
+                  </div>
+                  <div class="flex gap-2">
+                    <button onclick="saveMarkedSplit()" class="text-blue-600 px-4 py-2 rounded-lg font-semibold hover:bg-blue-50 transition-colors text-xs flex items-center gap-2 border border-transparent hover:border-blue-100"><span class="material-symbols-rounded text-sm">content_cut</span> 分割保存(ZIP)</button>
+                    <button onclick="savePdf()" class="bg-slate-800 text-white px-5 py-2 rounded-lg font-semibold hover:bg-slate-900 transition-colors text-xs flex items-center gap-2 shadow-lg shadow-slate-200"><span class="material-symbols-rounded text-sm">download</span> 結合保存</button>
+                  </div>
+                </div>
+                <div id="pdf-pages-container" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 overflow-y-auto min-h-0 flex-1 pb-4 p-2"></div>
+              </div>
+            </div>
+
+            <!-- 3. EXIF削除 -->
+            <div id="view-exif" class="view-section hidden h-full fade-in flex flex-col justify-center max-w-2xl mx-auto w-full">
+              <div class="bg-white rounded-3xl shadow-card border border-slate-100 overflow-hidden relative">
+                  <div id="exif-dropzone" class="p-12 flex flex-col items-center justify-center text-center transition-colors hover:bg-slate-50 relative min-h-[300px]">
+                    <input type="file" id="exif-input" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" accept="image/*">
+                    <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-400 to-purple-600 text-white flex items-center justify-center mb-4 shadow-lg shadow-purple-200"><span class="material-symbols-rounded text-3xl">no_photography</span></div>
+                    <h3 class="text-lg font-bold text-slate-700">ここに画像をドロップ</h3>
+                  </div>
+                  <div id="exif-result" class="hidden p-8 flex flex-col items-center">
+                    <div class="flex items-center gap-2 text-violet-600 font-bold mb-6 bg-violet-50 px-4 py-1 rounded-full text-xs"><span class="material-symbols-rounded text-sm">check_circle</span> 削除完了</div>
+                    <div class="relative w-full max-w-sm mb-6 group"><img id="exif-preview" class="w-full h-64 object-contain rounded-lg border border-slate-100 bg-slate-50"><button onclick="resetExif()" class="absolute top-2 right-2 bg-slate-900/80 text-white rounded-full p-1.5 hover:bg-red-500 transition-colors backdrop-blur-sm opacity-0 group-hover:opacity-100 shadow-lg"><span class="material-symbols-rounded text-sm">close</span></button></div>
+                    <a id="exif-download" href="#" class="bg-slate-800 text-white px-8 py-2.5 rounded-lg font-bold text-sm hover:bg-slate-900 transition-colors shadow-lg">保存する</a>
+                  </div>
+              </div>
+            </div>
+
+            <!-- 4. 配色抽出 -->
+            <div id="view-palette" class="view-section hidden h-full fade-in flex flex-col justify-center max-w-2xl mx-auto w-full">
+                <div class="bg-white rounded-3xl shadow-card border border-slate-100 overflow-hidden relative min-h-[400px]">
+                  <div id="palette-dropzone" class="absolute inset-0 flex flex-col items-center justify-center p-8 hover:bg-pink-50/30 transition-colors">
+                    <input type="file" id="palette-input" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" accept="image/*">
+                    <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-pink-400 to-pink-600 text-white flex items-center justify-center mb-4 shadow-lg shadow-pink-200"><span class="material-symbols-rounded text-3xl">palette</span></div>
+                    <h3 class="text-lg font-bold text-slate-700">ここに画像をドロップ</h3>
+                  </div>
+                  <div id="palette-result-area" class="relative z-20 hidden w-full h-full flex flex-col items-center p-8 overflow-y-auto">
+                    <div class="relative w-full max-w-sm mb-8 group shrink-0">
+                      <img id="palette-preview" class="w-full h-48 object-contain rounded-lg border border-slate-100 bg-slate-50">
+                      <button onclick="resetPalette()" class="absolute top-2 right-2 bg-slate-900/80 text-white rounded-full p-1.5 hover:bg-red-500 transition-colors backdrop-blur-sm shadow-lg"><span class="material-symbols-rounded text-sm">close</span></button>
+                    </div>
+                    <div id="palette-colors" class="flex flex-wrap justify-center gap-3 w-full shrink-0"></div>
+                  </div>
+                </div>
+            </div>
+
+            <!-- 5. 画像リサイズ -->
+            <div id="view-resize" class="view-section hidden h-full fade-in flex flex-col justify-center max-w-2xl mx-auto w-full">
+                <div class="bg-white rounded-3xl shadow-card border border-slate-100 overflow-hidden relative min-h-[400px] flex flex-col" id="resize-container">
+                  <div id="resize-placeholder" class="absolute inset-0 flex flex-col items-center justify-center p-8 hover:bg-cyan-50/30 transition-colors">
+                      <input type="file" id="resize-input" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" accept="image/*">
+                      <div class="w-16 h-16 rounded-full bg-cyan-50 text-cyan-500 flex items-center justify-center mb-4 shadow-lg shadow-cyan-200"><span class="material-symbols-rounded text-3xl">photo_size_select_small</span></div>
+                      <h3 class="text-lg font-bold text-slate-700">ここに画像をドロップ</h3>
+                  </div>
+                  <div id="resize-ui" class="hidden flex-1 p-8 flex flex-col items-center w-full z-20 bg-white">
+                      <div class="relative w-full max-w-sm mb-6 group shrink-0">
+                        <img id="resize-preview" class="w-full h-48 object-contain rounded-lg border border-slate-100 bg-slate-50">
+                        <button onclick="resetResize()" class="absolute top-2 right-2 bg-slate-900/80 text-white rounded-full p-1.5 hover:bg-red-500 transition-colors backdrop-blur-sm shadow-lg"><span class="material-symbols-rounded text-sm">close</span></button>
+                      </div>
+                      <p class="text-xs font-medium text-slate-500 mb-4 truncate w-full text-center" id="resize-filename">filename.jpg</p>
+                      <div class="w-full max-w-xs space-y-4 mb-6">
+                        <div class="flex items-center gap-3">
+                          <div class="flex-1"><label class="text-[10px] font-bold text-slate-400 uppercase mb-1 block">横幅</label><input type="number" id="resize-width" value="800" class="w-full bg-slate-50 rounded-lg p-2 text-sm border border-slate-200"></div>
+                          <div class="flex-1"><label class="text-[10px] font-bold text-slate-400 uppercase mb-1 block">高さ</label><input type="text" value="自動" disabled class="w-full bg-slate-100 rounded-lg p-2 text-sm text-slate-400"></div>
+                        </div>
+                      </div>
+                      <button onclick="processResize()" class="bg-slate-800 text-white px-8 py-2.5 rounded-lg font-bold text-sm hover:bg-slate-900 shadow-lg">リサイズ実行</button>
+                      <div id="resize-result" class="hidden mt-4 w-full max-w-xs"><a id="resize-download" href="#" download="resized.png" class="block w-full text-center text-cyan-600 font-bold text-sm hover:underline py-2">画像を保存</a></div>
+                  </div>
+                </div>
+            </div>
+
+            <!-- 6. QR生成 -->
+            <div id="view-qr" class="view-section hidden h-full fade-in flex flex-col justify-center max-w-lg mx-auto w-full">
+                <div class="bg-white rounded-3xl shadow-card border border-slate-100 p-8 flex flex-col items-center">
+                  <h2 class="text-lg font-bold text-slate-700 mb-6 flex items-center gap-2"><span class="material-symbols-rounded text-emerald-500">qr_code_2</span> QR作成</h2>
+                  <div class="w-full relative mb-8">
+                    <input type="text" id="qr-text" placeholder="https://example.com" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-4 pl-4 pr-12 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all" oninput="generateQR()">
+                    <span class="material-symbols-rounded absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">link</span>
+                  </div>
+                  <div id="qr-code-area" class="bg-white p-4 rounded-xl border border-slate-100 w-48 h-48 flex items-center justify-center shadow-subtle"><span class="text-slate-300 text-xs">テキストを入力してください</span></div>
+                </div>
+            </div>
+
+            <!-- 7. パスワード生成 -->
+            <div id="view-pass" class="view-section hidden h-full fade-in flex flex-col justify-center max-w-lg mx-auto w-full">
+              <div class="bg-white rounded-3xl shadow-card border border-slate-100 p-8">
+                  <div class="bg-slate-900 text-white p-8 rounded-xl mb-8 text-center shadow-lg relative overflow-hidden group">
+                    <div id="pass-display" class="text-2xl font-mono tracking-widest break-all relative z-10 font-bold"></div>
+                    <button class="absolute inset-0 w-full h-full bg-slate-800/90 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 font-bold text-sm cursor-pointer" onclick="copyPass()"><span class="material-symbols-rounded text-lg">content_copy</span> コピー</button>
+                  </div>
+                  <div class="space-y-6">
+                    <div><div class="flex justify-between mb-2"><span class="text-xs font-bold text-slate-500">文字数</span><span id="pass-len-val" class="text-sm font-bold">12</span></div><input type="range" id="pass-len" min="8" max="32" value="12" class="w-full accent-slate-900 h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer" oninput="document.getElementById('pass-len-val').innerText = this.value"></div>
+                    <div class="flex gap-4"><label class="flex items-center gap-2 p-3 border rounded-lg w-full justify-center cursor-pointer bg-slate-50"><input type="checkbox" id="pass-num" checked class="accent-slate-900"><span class="text-sm font-medium text-slate-700">数字</span></label><label class="flex items-center gap-2 p-3 border rounded-lg w-full justify-center cursor-pointer bg-slate-50"><input type="checkbox" id="pass-sym" checked class="accent-slate-900"><span class="text-sm font-medium text-slate-700">記号</span></label></div>
+                    <button onclick="generatePass()" class="w-full bg-slate-900 text-white py-3 rounded-lg font-bold text-sm hover:bg-slate-800">再生成</button>
+                  </div>
+              </div>
+            </div>
+
+            <!-- 8. ゲーム (2048) -->
+            <div id="view-game" class="view-section hidden h-full fade-in flex flex-col justify-center items-center">
+              <div class="bg-white rounded-3xl shadow-card border border-slate-100 p-8 flex flex-col items-center relative">
+                  <div id="game-message" class="absolute inset-0 z-10 bg-slate-900/90 rounded-3xl flex flex-col items-center justify-center hidden animate-[fadeIn_0.3s_ease-out]">
+                      <p id="game-message-text" class="text-4xl font-bold text-white mb-6">Game Over</p>
+                      <button onclick="initGame()" class="bg-indigo-500 text-white px-8 py-3 rounded-xl font-bold hover:bg-indigo-600 transition-colors shadow-lg">Try Again</button>
+                  </div>
+                  <button onclick="showGameRule()" class="absolute top-8 right-8 text-slate-400 hover:text-slate-600 transition-colors"><span class="material-symbols-rounded text-2xl">help</span></button>
+                  <div class="flex justify-between items-center w-full mb-6 gap-8">
+                    <div><h2 class="text-2xl font-bold text-slate-800">数字パズル</h2><p class="text-xs text-slate-500">2048を目指そう</p></div>
+                    <div class="text-right"><div class="bg-slate-100 px-3 py-1 rounded text-xs font-bold text-slate-500 mb-1">スコア</div><div class="text-xl font-bold text-slate-800" id="game-score">0</div></div>
+                    <div class="text-right"><div class="bg-slate-100 px-3 py-1 rounded text-xs font-bold text-slate-500 mb-1">ベスト</div><div class="text-xl font-bold text-slate-800" id="game-best">0</div></div>
+                  </div>
+                  <div id="game-container" class="game-grid mb-6 touch-none"></div>
+                  <div class="flex gap-4"><button onclick="initGame()" class="bg-slate-900 text-white px-6 py-2 rounded-lg font-bold text-sm hover:bg-slate-800 transition-colors shadow-lg">最初から</button></div>
+                  <div class="grid grid-cols-3 gap-2 mt-6 md:hidden">
+                    <div></div><button onclick="handleGameInput('ArrowUp')" class="bg-slate-100 p-4 rounded-lg active:bg-slate-200"><span class="material-symbols-rounded">keyboard_arrow_up</span></button><div></div>
+                    <button onclick="handleGameInput('ArrowLeft')" class="bg-slate-100 p-4 rounded-lg active:bg-slate-200"><span class="material-symbols-rounded">keyboard_arrow_left</span></button>
+                    <button onclick="handleGameInput('ArrowDown')" class="bg-slate-100 p-4 rounded-lg active:bg-slate-200"><span class="material-symbols-rounded">keyboard_arrow_down</span></button>
+                    <button onclick="handleGameInput('ArrowRight')" class="bg-slate-100 p-4 rounded-lg active:bg-slate-200"><span class="material-symbols-rounded">keyboard_arrow_right</span></button>
+                  </div>
+              </div>
+            </div>
+
+            <!-- 10. おみくじ -->
+            <div id="view-omikuji" class="view-section hidden h-full fade-in flex flex-col justify-center items-center">
+              <div class="bg-white rounded-3xl shadow-card border border-slate-100 p-8 flex flex-col items-center max-w-md w-full relative min-h-[450px] justify-center overflow-hidden">
+                  <div id="omikuji-start" class="flex flex-col items-center justify-center gap-8 py-4 w-full h-full">
+                    <div class="relative p-4"><div id="omikuji-box" class="text-9xl leading-none cursor-pointer hover:scale-105 transition-transform origin-bottom select-none drop-shadow-sm" onclick="drawOmikuji()">🎁</div></div>
+                    <div class="text-center space-y-2"><h2 class="text-2xl font-bold text-slate-800">デジタルおみくじ</h2><p class="text-slate-500 text-sm">今日の運勢を占ってみましょう</p></div>
+                    <button onclick="drawOmikuji()" class="bg-rose-500 text-white px-10 py-3 rounded-full font-bold text-lg shadow-lg hover:bg-rose-600 transition-colors shadow-rose-100 active:scale-95">おみくじを引く</button>
+                  </div>
+                  <div id="omikuji-result" class="hidden flex-col items-center w-full animate-[fadeIn_0.5s_ease-out] justify-center h-full">
+                    <div class="text-sm font-bold text-slate-400 tracking-widest uppercase mb-2">TODAY'S FORTUNE</div>
+                    <div id="omikuji-rank" class="text-5xl font-black text-rose-500 mb-4 tracking-tight" style="text-shadow: 2px 2px 0px rgba(251, 113, 133, 0.2);">大吉</div>
+                    <p id="omikuji-msg" class="text-lg font-bold text-slate-700 mb-6 text-center leading-relaxed">素晴らしい一日になりそうです！</p>
+                    <div class="w-full bg-slate-50 rounded-xl p-4 mb-6 space-y-3 border border-slate-100">
+                        <div class="flex gap-3 items-start"><span class="bg-blue-100 text-blue-600 p-1 rounded text-xs font-bold shrink-0 mt-0.5">仕事</span><span id="omikuji-work" class="text-sm text-slate-600">プロジェクトが成功する予感</span></div>
+                        <div class="flex gap-3 items-start"><span class="bg-pink-100 text-pink-600 p-1 rounded text-xs font-bold shrink-0 mt-0.5">対人</span><span id="omikuji-love" class="text-sm text-slate-600">笑顔で接すると吉</span></div>
+                        <div class="flex gap-3 items-start"><span class="bg-yellow-100 text-yellow-600 p-1 rounded text-xs font-bold shrink-0 mt-0.5">幸運</span><span id="omikuji-item" class="text-sm text-slate-600 font-bold">新しい文房具</span></div>
+                    </div>
+                    <button onclick="resetOmikuji()" class="text-slate-400 hover:text-slate-600 text-sm font-bold flex items-center gap-1 mt-auto"><span class="material-symbols-rounded text-lg">refresh</span> もう一度引く</button>
+                  </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 9. Desktop Golf (全画面) -->
+        <div id="view-golf" class="view-section hidden absolute inset-0 z-50 w-full h-full overflow-hidden font-sans select-none bg-black">
+            <div class="absolute inset-0 z-0 bg-gradient-to-br from-[#ff9a9e] via-[#fecfef] to-[#a18cd1] animate-gradient-bg bg-[length:400%_400%]"></div>
+            <canvas id="golf-canvas" class="absolute inset-0 z-10 block"></canvas>
+            
+            <!-- UI (クリック透過設定済み) -->
+            <div id="golf-ui" class="absolute top-6 right-6 w-64 bg-white/65 backdrop-blur-xl p-6 rounded-3xl shadow-lg border border-white/30 z-20 transition-all duration-300 pointer-events-none origin-top-right">
+                <div class="w-full relative"> <!-- ここは auto にしない -->
+                    <!-- トグルボタン: ここは auto -->
+                    <button onclick="toggleGolfUi()" class="pointer-events-auto absolute -top-2 -right-2 p-2 text-slate-400 hover:text-slate-600 transition-colors z-50 rounded-full hover:bg-white/50" title="切り替え">
+                        <span id="golf-toggle-icon" class="material-symbols-rounded text-xl">expand_less</span>
+                    </button>
+                    <!-- フル表示 -->
+                    <div id="golf-ui-full">
+                        <h1 class="text-lg font-bold text-slate-900 text-center mb-4 tracking-tight">机上のゴルフ</h1>
+                        <div class="flex justify-between text-sm text-slate-800 mb-2"><span>レベル</span><span class="font-semibold" id="golf-level">1 / 20</span></div>
+                        <div class="flex justify-between text-sm text-slate-800 mb-2"><span>打数</span><span class="font-semibold"><span id="golf-shots">0</span> <span class="text-slate-500 font-normal ml-1">(Par <span id="golf-par">3</span>)</span></span></div>
+                        <div class="flex justify-between text-sm text-slate-800 mb-4"><span>スコア</span><span class="font-semibold" id="golf-score">0</span></div>
+                        <p class="text-xs text-slate-500 text-center leading-relaxed mb-4">フォルダをドラッグして飛ばし<br>ゴミ箱に入れればクリアです</p>
+                        <button onclick="golfGame.resetLevel()" class="pointer-events-auto w-full bg-[#007AFF] hover:bg-[#0062cc] text-white font-semibold py-2.5 rounded-xl text-sm transition-all shadow-md active:scale-95">やり直す</button>
+                        <div class="mt-4 pt-4 border-t border-slate-200/50 text-center"><p class="text-[10px] text-slate-400">Escキーでボスモード（隠す）</p></div>
+                    </div>
+                    <!-- ミニ表示 (さらに小さく) -->
+                    <div id="golf-ui-mini" class="hidden flex items-center gap-2 py-0.5 pr-6">
+                        <div class="text-xs font-bold text-slate-800 whitespace-nowrap"><span class="text-slate-500">打</span><span id="golf-shots-mini" class="text-[#007AFF] ml-1">0</span></div>
+                        <button onclick="golfGame.resetLevel()" class="pointer-events-auto bg-[#007AFF] hover:bg-[#0062cc] text-white p-1 rounded transition-all shadow-md active:scale-95 flex items-center justify-center w-5 h-5" title="やり直す">
+                            <span class="material-symbols-rounded text-sm">refresh</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Boss Mode -->
+            <div id="golf-boss-mode" class="absolute inset-0 z-50 bg-[#f5f5f7] hidden flex-col font-sans text-[#333] overflow-y-auto">
+                <div class="bg-white border-b border-[#ddd] px-5 py-3 flex gap-5 text-xs sticky top-0"><strong class="font-bold">企画書_v2.pages</strong><span class="text-gray-400">|</span><span>表示</span><span>拡大/縮小</span><span>挿入</span><span>フォーマット</span></div>
+                <div class="w-[800px] min-h-[1000px] bg-white mx-auto my-10 shadow-lg p-20 box-border">
+                     <h1 class="text-3xl font-bold mb-2">2025年度 第3四半期 マーケティング戦略</h1>
+                     <p class="text-sm text-gray-500 mb-10">作成日: 2025年2月6日 | 担当: 企画部</p>
+                     <h2 class="text-lg border-b border-gray-100 pb-2 mt-8 mb-4 font-bold">1. はじめに</h2>
+                     <p class="text-sm leading-relaxed mb-4">本ドキュメントは、来期の主要プロダクトにおけるプロモーション戦略の概要をまとめたものである...</p>
+                     <div class="mt-40 text-center text-xs text-gray-400">(Escキーで戻る)</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 共通オーバーレイ -->
+        <div id="drag-overlay" class="absolute inset-0 drag-overlay hidden flex flex-col items-center justify-center pointer-events-none rounded-3xl transition-opacity opacity-0 z-50">
+          <div class="bg-white/80 backdrop-blur-xl p-10 rounded-3xl shadow-2xl flex flex-col items-center border border-white/40">
+            <span class="material-symbols-rounded text-6xl text-accent mb-4 animate-bounce">upload_file</span>
+            <h2 class="text-xl font-bold text-slate-800">Drop Files Here</h2>
+          </div>
+        </div>
+        <div id="loading-overlay" class="absolute inset-0 bg-white/60 z-40 hidden flex flex-col items-center justify-center backdrop-blur-sm rounded-2xl">
+          <div class="spinner mb-4"></div>
+          <p class="font-medium text-slate-600 text-sm">Processing...</p>
+        </div>
+
+        <!-- 各種モーダル -->
+        <div id="pdf-preview-modal" class="fixed inset-0 z-50 hidden bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-4" onclick="closePdfPreview(event)">
+            <div class="bg-transparent w-full max-w-5xl h-full max-h-screen flex flex-col items-center justify-center relative pointer-events-none">
+               <button onclick="closePdfPreview()" class="pointer-events-auto absolute top-4 right-4 bg-white/20 text-white p-2 rounded-full hover:bg-white/40 transition-colors backdrop-blur-md z-50"><span class="material-symbols-rounded text-2xl">close</span></button>
+               <div class="relative w-full h-full flex items-center justify-center p-4 pointer-events-auto" onclick="event.stopPropagation()"><canvas id="pdf-preview-canvas" class="max-w-full max-h-full shadow-2xl rounded-lg"></canvas></div>
+            </div>
+        </div>
+        <div id="game-rule-modal" class="fixed inset-0 z-50 hidden bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4" onclick="closeGameRule(event)">
+             <div class="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full relative pointer-events-auto animate-[fadeIn_0.3s_ease-out]">
+                <button onclick="closeGameRule()" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 transition-colors"><span class="material-symbols-rounded">close</span></button>
+                <h3 class="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2"><span class="material-symbols-rounded text-indigo-500">sports_esports</span> 遊び方</h3>
+                <div class="space-y-4 text-sm text-slate-600 mb-6">
+                   <div class="flex items-start gap-3"><div class="bg-slate-100 p-2 rounded-lg text-slate-500 shrink-0"><span class="material-symbols-rounded">pan_tool_alt</span></div><div><p class="font-bold text-slate-700">1. タイルを動かす</p><p>矢印キー(PC)またはスワイプ(スマホ)で、全てのタイルを上下左右に動かせます。</p></div></div>
+                   <div class="flex items-start gap-3"><div class="bg-slate-100 p-2 rounded-lg text-slate-500 shrink-0"><span class="material-symbols-rounded">merge</span></div><div><p class="font-bold text-slate-700">2. 数字を合体！</p><p>同じ数字のタイルがぶつかると、合体して倍の数字になります。<br>(2+2=4, 4+4=8...)</p></div></div>
+                   <div class="flex items-start gap-3"><div class="bg-slate-100 p-2 rounded-lg text-slate-500 shrink-0"><span class="material-symbols-rounded">emoji_events</span></div><div><p class="font-bold text-slate-700">3. 目指せ2048</p><p>どんどん数字を大きくして、「2048」のタイルを作ることが目標です。動かせなくなったら終了です。</p></div></div>
+                </div>
+                <button onclick="closeGameRule()" class="w-full bg-indigo-500 text-white py-3 rounded-xl font-bold hover:bg-indigo-600 transition-colors shadow-md shadow-indigo-200">わかった！</button>
+             </div>
+        </div>
+        <div id="golf-rule-modal" class="fixed inset-0 z-50 hidden bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 pointer-events-auto" onclick="closeGolfRule(event)">
+           <div class="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full relative pointer-events-auto animate-[fadeIn_0.3s_ease-out]">
+              <button onclick="closeGolfRule()" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 transition-colors"><span class="material-symbols-rounded">close</span></button>
+              <h3 class="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2"><span class="material-symbols-rounded text-[#007AFF]">folder_open</span> 遊び方</h3>
+              <div class="space-y-4 text-sm text-slate-600 mb-6">
+                 <div class="flex items-start gap-3"><div class="bg-slate-100 p-2 rounded-lg text-slate-500 shrink-0"><span class="material-symbols-rounded">drag_indicator</span></div><div><p class="font-bold text-slate-700">1. ドラッグして飛ばす</p><p>フォルダをマウスで引っ張って離すと飛びます。</p></div></div>
+                 <div class="flex items-start gap-3"><div class="bg-slate-100 p-2 rounded-lg text-slate-500 shrink-0"><span class="material-symbols-rounded">delete</span></div><div><p class="font-bold text-slate-700">2. ゴミ箱へ入れる</p><p>ステージにあるゴミ箱（カップ）に入れればクリア！</p></div></div>
+                 <div class="flex items-start gap-3"><div class="bg-slate-100 p-2 rounded-lg text-slate-500 shrink-0"><span class="material-symbols-rounded">visibility_off</span></div><div><p class="font-bold text-slate-700">3. 緊急回避</p><p>上司が来たら「Esc」キー。真面目な企画書が表示されます。</p></div></div>
+              </div>
+              <button onclick="closeGolfRule()" class="w-full bg-[#007AFF] text-white py-3 rounded-xl font-bold hover:bg-[#0062cc] transition-colors shadow-md">始める</button>
+           </div>
+        </div>
+
+      </div>
+    </div>
+  </main>
+
+  <div id="toast" class="fixed bottom-8 right-8 bg-slate-900 text-white px-6 py-3 rounded-lg shadow-2xl opacity-0 transition-opacity duration-300 pointer-events-none z-50 flex items-center gap-3 translate-y-4 transition-transform">
+    <span class="material-symbols-rounded text-emerald-400">check_circle</span>
+    <span id="toast-msg" class="font-medium text-sm">完了しました</span>
+  </div>
+
+  <script>
+    // === 共通ヘルパー (トップレベル定義) ===
+    function showToast(msg) {
+      const toast = document.getElementById('toast');
+      document.getElementById('toast-msg').innerText = msg;
+      toast.classList.remove('opacity-0', 'translate-y-4');
+      setTimeout(() => { toast.classList.add('opacity-0', 'translate-y-4'); }, 3000);
+    }
+    
+    function toggleLoading(show) {
+      const overlay = document.getElementById('loading-overlay');
+      if (show) overlay.classList.remove('hidden'); else overlay.classList.add('hidden');
+    }
+
+    function playConfetti() {
+      confetti({ particleCount: 80, spread: 60, origin: { y: 0.7 }, colors: ['#3B82F6', '#60A5FA', '#93C5FD', '#1E40AF'] });
+    }
+
+    function copyTextToClipboard(text) {
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(text).then(() => {
+          showToast("コピーしました");
+          playConfetti();
+        }).catch(err => fallbackCopyText(text));
+      } else { fallbackCopyText(text); }
+    }
+
+    function fallbackCopyText(text) {
+      const textArea = document.createElement("textarea");
+      textArea.value = text;
+      textArea.style.position = "fixed";
+      textArea.style.left = "-9999px";
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+      try {
+        if(document.execCommand('copy')) { showToast("コピーしました"); playConfetti(); }
+        else showToast("コピー失敗");
+      } catch (err) { showToast("コピー失敗"); }
+      document.body.removeChild(textArea);
+    }
+
+    function blobToDataURL(blob) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = e => resolve(e.target.result);
+        reader.onerror = e => reject(e);
+        reader.readAsDataURL(blob);
+      });
+    }
+
+    // EXIF削除などのための強力な再エンコード関数 (Canvasを使用)
+    function reEncodeImage(file, mimeType) {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        const url = URL.createObjectURL(file);
+        img.onload = () => {
+           const canvas = document.createElement('canvas');
+           canvas.width = img.width;
+           canvas.height = img.height;
+           const ctx = canvas.getContext('2d');
+           ctx.drawImage(img, 0, 0);
+           URL.revokeObjectURL(url);
+           resolve(canvas.toDataURL(mimeType));
+        };
+        img.onerror = reject;
+        img.src = url;
+      });
+    }
+
+    // === グローバル変数 ===
+    let currentTab = 'home';
+    let selectedResizeFile = null;
+    let pdfDocs = [];
+    let pdfJsDocs = [];
+    let pageMap = [];
+    let gameRuleShown = false;
+    let golfRuleShown = false; 
+    let gameWon = false;
+
+    const TOOLS = {
+      home: { title: "ツクエノウエ", desc: "便利ツール集" },
+      palette: { title: "配色抽出", desc: "画像からドミナントカラーを抽出" },
+      pdf: { title: "PDF工房", desc: "PDFの結合・分割・回転・削除" },
+      exif: { title: "写真情報(Exif)削除", desc: "写真の位置情報を削除してプライバシー保護" },
+      resize: { title: "画像サイズ変更", desc: "Web用に画像を高速リサイズ" },
+      qr: { title: "QR作成", desc: "テキストを瞬時にQRコード化" },
+      pass: { title: "パスワード生成", desc: "強固なパスワードをローカル生成" },
+      game: { title: "数字パズル", desc: "2048風パズルゲーム" },
+      golf: { title: "机上のゴルフ", desc: "息抜きアクションゲーム" },
+      omikuji: { title: "デジタルおみくじ", desc: "今日の運勢を占う" },
+    };
+
+    function switchTab(id) {
+      currentTab = id;
+      
+      // コンテナ切り替えロジック
+      const stdContainer = document.getElementById('standard-view-container');
+      const golfContainer = document.getElementById('view-golf');
+      
+      if (id === 'golf') {
+          stdContainer.classList.add('hidden');
+          golfContainer.classList.remove('hidden');
+      } else {
+          stdContainer.classList.remove('hidden');
+          golfContainer.classList.add('hidden');
+      }
+
+      // 通常ビュー内のセクション切り替え
+      document.querySelectorAll('#standard-view-container .view-section').forEach(el => {
+        el.classList.add('hidden');
+        el.classList.remove('fade-in');
+      });
+      
+      if(id !== 'golf') {
+          const activeView = document.getElementById('view-' + id);
+          if(activeView) {
+              activeView.classList.remove('hidden');
+              void activeView.offsetWidth;
+              activeView.classList.add('fade-in');
+          }
+      }
+      
+      document.querySelectorAll('.nav-btn').forEach(btn => {
+        btn.classList.remove('active', 'bg-black/5');
+        btn.classList.add('text-slate-400');
+      });
+      const activeBtn = document.getElementById('nav-' + id);
+      if(activeBtn) {
+        activeBtn.classList.remove('text-slate-400');
+        activeBtn.classList.add('active'); 
+      }
+
+      const backBtn = document.getElementById('back-home-btn');
+      if (id === 'home') backBtn.classList.add('hidden');
+      else backBtn.classList.remove('hidden');
+
+      const info = TOOLS[id];
+      document.getElementById('page-title').innerText = info.title;
+      document.getElementById('page-desc').innerText = info.desc;
+      
+      if(id === 'game') {
+          initGameIfNotStarted();
+          if(!gameRuleShown) { setTimeout(showGameRule, 300); gameRuleShown = true; }
+      }
+      
+      // Golf Game Lifecycle
+      if(id === 'golf') {
+          setTimeout(() => {
+              if (!golfGame.isInitialized) {
+                  golfGame.init();
+              } else {
+                  golfGame.start();
+              }
+              if(!golfRuleShown) {
+                  showGolfRule();
+                  golfRuleShown = true;
+              }
+          }, 100);
+      } else {
+          if (golfGame.isInitialized) {
+              golfGame.stop();
+          }
+      }
+    }
+
+    // === Drag & Drop (Unified) ===
+    const dragOverlay = document.getElementById('drag-overlay');
+    let dragCounter = 0;
+    let isSorting = false;
+    document.addEventListener('dragenter', (e) => {
+      e.preventDefault();
+      if (isSorting) return;
+      if (!['exif', 'palette', 'resize', 'pdf'].includes(currentTab)) return;
+      if (e.dataTransfer && e.dataTransfer.types && !e.dataTransfer.types.includes("Files")) return;
+      dragCounter++;
+      dragOverlay.classList.remove('hidden');
+      setTimeout(() => dragOverlay.classList.remove('opacity-0'), 10);
+    });
+    document.addEventListener('dragleave', (e) => {
+      e.preventDefault();
+      if (dragOverlay.classList.contains('hidden')) return;
+      dragCounter--;
+      if (dragCounter === 0) {
+        dragOverlay.classList.add('opacity-0');
+        setTimeout(() => dragOverlay.classList.add('hidden'), 300);
+      }
+    });
+    document.addEventListener('dragover', (e) => e.preventDefault());
+    document.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dragCounter = 0;
+      dragOverlay.classList.add('opacity-0');
+      setTimeout(() => dragOverlay.classList.add('hidden'), 300);
+      if (isSorting) return;
+      if (!['exif', 'palette', 'resize', 'pdf'].includes(currentTab)) return;
+      const files = e.dataTransfer.files;
+      if (files.length === 0) return;
+      if (currentTab === 'pdf') {
+         processPdfFile(Array.from(files).filter(f => f.type === 'application/pdf'));
+      } else {
+         const file = files[0];
+         if (!file.type.startsWith('image/')) { showToast("画像ファイルをドロップしてください"); return; }
+         if (currentTab === 'exif') processExifFile(file);
+         if (currentTab === 'palette') processPaletteFile(file);
+         if (currentTab === 'resize') processResizeFile(file);
+      }
+    });
+    function handlePaste(event) {
+      if (!['exif', 'palette', 'resize', 'pdf'].includes(currentTab)) return;
+      const items = (event.clipboardData || event.originalEvent.clipboardData).items;
+      for (let index in items) {
+        const item = items[index];
+        if (item.kind === 'file') {
+           const blob = item.getAsFile();
+           if (currentTab === 'pdf' && blob.type === 'application/pdf') {
+             processPdfFile([blob]);
+             showToast("PDFを貼り付けました");
+           } else if (item.type.indexOf('image/') !== -1) {
+             if (currentTab === 'exif') processExifFile(blob);
+             if (currentTab === 'palette') processPaletteFile(blob);
+             if (currentTab === 'resize') processResizeFile(blob);
+             showToast("画像を貼り付けました");
+           }
+        }
+      }
+    }
+
+    // === PDF Logic ===
+    function openPdfPreview(pageId) {
+      const pageData = pageMap[pageId];
+      if (!pageData) return;
+      toggleLoading(true);
+      const pdfDoc = pdfJsDocs[pageData.docIndex];
+      pdfDoc.getPage(pageData.pageIndex + 1).then(page => {
+        const modal = document.getElementById('pdf-preview-modal');
+        const canvas = document.getElementById('pdf-preview-canvas');
+        const context = canvas.getContext('2d');
+        const viewport = page.getViewport({ scale: 2.0, rotation: pageData.rotation });
+        canvas.height = viewport.height;
+        canvas.width = viewport.width;
+        page.render({ canvasContext: context, viewport: viewport }).promise.then(() => {
+          modal.classList.remove('hidden');
+          toggleLoading(false);
+        });
+      }).catch(err => {
+        console.error(err);
+        showToast("プレビュー表示エラー");
+        toggleLoading(false);
+      });
+    }
+    function closePdfPreview(e) {
+      if (!e || e.target.id === 'pdf-preview-modal' || e.target.tagName === 'BUTTON' || e.target.closest('button')) {
+        document.getElementById('pdf-preview-modal').classList.add('hidden');
+      }
+    }
+    document.getElementById('pdf-input').addEventListener('change', (e) => {
+      if(e.target.files.length > 0) processPdfFile(Array.from(e.target.files));
+    });
+    function handlePdfAdd(input) {
+      if(input.files.length > 0) processPdfFile(Array.from(input.files));
+      input.value = "";
+    }
+    async function processPdfFile(files) {
+       if (files.length === 0) return;
+       toggleLoading(true);
+       try {
+          const container = document.getElementById('pdf-pages-container');
+          document.getElementById('pdf-dropzone').classList.add('hidden');
+          document.getElementById('pdf-ui').classList.remove('hidden');
+          for (let file of files) {
+             const arrayBuffer = await file.arrayBuffer();
+             const pdfDoc = await PDFLib.PDFDocument.load(arrayBuffer);
+             const docIndex = pdfDocs.length;
+             pdfDocs.push(pdfDoc);
+             const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+             const pdfJsDoc = await loadingTask.promise;
+             pdfJsDocs.push(pdfJsDoc);
+             for (let i = 0; i < pdfJsDoc.numPages; i++) {
+                const pageNum = i + 1;
+                const pageId = pageMap.length;
+                pageMap.push({ docIndex: docIndex, pageIndex: i, rotation: 0, split: false });
+                const page = await pdfJsDoc.getPage(pageNum);
+                const scale = 0.6;
+                const viewport = page.getViewport({ scale: scale });
+                const cardDiv = document.createElement('div');
+                cardDiv.className = "pdf-page-card relative bg-white rounded-lg shadow-sm border border-slate-200 p-2 flex flex-col items-center justify-center group select-none min-h-[220px]";
+                cardDiv.id = `pdf-page-${pageId}`;
+                const canvas = document.createElement('canvas');
+                const context = canvas.getContext('2d');
+                canvas.height = viewport.height;
+                canvas.width = viewport.width;
+                canvas.className = "rounded shadow-sm max-w-full max-h-[200px] w-auto h-auto object-contain mb-0 bg-slate-50 cursor-grab active:cursor-grabbing";
+                canvas.onclick = () => openPdfPreview(pageId);
+                await page.render({ canvasContext: context, viewport: viewport }).promise;
+                const controls = document.createElement('div');
+                controls.className = "pdf-controls absolute inset-0 bg-slate-900/60 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity flex flex-row items-center justify-center gap-2 backdrop-blur-[2px] z-20";
+                const createBtn = (icon, color, action, title) => {
+                    const btn = document.createElement('button');
+                    btn.className = `bg-white text-slate-700 p-2 rounded-full shadow-lg hover:${color} hover:text-white transition-colors flex items-center justify-center`;
+                    btn.innerHTML = `<span class="material-symbols-rounded text-lg">${icon}</span>`;
+                    btn.title = title;
+                    btn.onclick = (e) => { e.stopPropagation(); action(); };
+                    return btn;
+                };
+                const splitBtn = document.createElement('button');
+                splitBtn.className = "bg-white text-slate-700 p-2 rounded-full shadow-lg hover:bg-blue-500 hover:text-white transition-colors flex items-center justify-center";
+                splitBtn.innerHTML = '<span class="material-symbols-rounded text-lg">content_cut</span>';
+                splitBtn.id = `btn-split-${pageId}`;
+                splitBtn.title = "ここから分割";
+                splitBtn.onclick = (e) => { e.stopPropagation(); toggleSplit(pageId); };
+                if (pageId === 0) splitBtn.style.display = 'none';
+                controls.appendChild(splitBtn);
+                controls.appendChild(createBtn('zoom_in', 'bg-blue-600', () => openPdfPreview(pageId), '拡大'));
+                controls.appendChild(createBtn('rotate_right', 'bg-orange-500', () => rotatePage(pageId, canvas), '回転'));
+                controls.appendChild(createBtn('download', 'bg-emerald-500', () => saveSinglePage(pageId), '保存'));
+                controls.appendChild(createBtn('delete', 'bg-red-500', () => deletePage(pageId), '削除'));
+                cardDiv.appendChild(canvas);
+                cardDiv.appendChild(controls);
+                const badge = document.createElement('span');
+                badge.className = "absolute bottom-2 right-2 bg-slate-900/80 text-white text-[10px] px-2 py-0.5 rounded-full font-mono z-10";
+                badge.innerText = `${pageNum}`;
+                cardDiv.appendChild(badge);
+                const splitBadge = document.createElement('span');
+                splitBadge.className = "split-badge absolute top-0 left-0 m-1 bg-blue-500 text-white p-1 rounded-full shadow-md z-30";
+                splitBadge.innerHTML = '<span class="material-symbols-rounded text-xs">content_cut</span>';
+                cardDiv.appendChild(splitBadge);
+                container.appendChild(cardDiv);
+             }
+          }
+          showToast(`${files.length} 件のファイルを追加`);
+       } catch (e) { showToast("エラーが発生しました"); } finally { toggleLoading(false); }
+    }
+    function rotatePage(pageId, canvas) {
+       const pageData = pageMap[pageId];
+       pageData.rotation = (pageData.rotation + 90) % 360;
+       canvas.style.transform = `rotate(${pageData.rotation}deg)`;
+    }
+    function deletePage(pageId) {
+       const card = document.getElementById(`pdf-page-${pageId}`);
+       if (card) { card.remove(); pageMap[pageId] = null; }
+    }
+    function toggleSplit(pageId) {
+       const p = pageMap[pageId];
+       if (!p) return;
+       p.split = !p.split;
+       const card = document.getElementById(`pdf-page-${pageId}`);
+       if (p.split) card.classList.add('split-start');
+       else card.classList.remove('split-start');
+    }
+    function getActivePagesOrdered() {
+        const container = document.getElementById('pdf-pages-container');
+        const cards = container.querySelectorAll('.pdf-page-card');
+        const pages = [];
+        cards.forEach(card => {
+            const id = parseInt(card.id.replace('pdf-page-', ''));
+            if (pageMap[id]) { pages.push(pageMap[id]); }
+        });
+        return pages;
+    }
+    async function saveMarkedSplit() {
+        const activePages = getActivePagesOrdered();
+        if (activePages.length === 0 || !activePages.some(p => p.split)) { showToast("分割場所を指定してください"); return; }
+        toggleLoading(true);
+        try {
+            const zip = new JSZip();
+            const folder = zip.folder("split_pdf");
+            let currentChunk = [];
+            let fileCount = 1;
+            for (let i = 0; i < activePages.length; i++) {
+               const p = activePages[i];
+               if (p.split && currentChunk.length > 0) {
+                  const pdfBytes = await createPdfFromPages(currentChunk);
+                  folder.file(`part_${fileCount}.pdf`, pdfBytes);
+                  fileCount++;
+                  currentChunk = [];
+               }
+               currentChunk.push(p);
+            }
+            if (currentChunk.length > 0) {
+               const pdfBytes = await createPdfFromPages(currentChunk);
+               folder.file(`part_${fileCount}.pdf`, pdfBytes);
+            }
+            const content = await zip.generateAsync({ type: "blob" });
+            downloadFile(URL.createObjectURL(content), "split_files.zip");
+            playConfetti();
+            showToast("ZIP作成完了");
+        } catch(e) { showToast("エラー"); } finally { toggleLoading(false); }
+    }
+    async function saveSinglePage(pageId) {
+        toggleLoading(true);
+        try {
+            const p = pageMap[pageId];
+            if (!p) return;
+            const pdfBytes = await createPdfFromPages([p]);
+            const blob = new Blob([pdfBytes], { type: "application/pdf" });
+            downloadFile(URL.createObjectURL(blob), `page.pdf`);
+            showToast("保存しました");
+        } catch(e) { showToast("エラー"); } finally { toggleLoading(false); }
+    }
+    async function savePdf() {
+       const activePages = getActivePagesOrdered();
+       if (activePages.length === 0) return;
+       toggleLoading(true);
+       try {
+          const pdfBytes = await createPdfFromPages(activePages);
+          const blob = new Blob([pdfBytes], { type: "application/pdf" });
+          downloadFile(URL.createObjectURL(blob), "merged.pdf");
+          playConfetti();
+          showToast("PDF作成完了");
+       } catch (e) { showToast("エラー"); } finally { toggleLoading(false); }
+    }
+    function resetPdf() {
+       pdfDocs = []; pdfJsDocs = []; pageMap = [];
+       document.getElementById('pdf-pages-container').innerHTML = '';
+       document.getElementById('pdf-ui').classList.add('hidden');
+       document.getElementById('pdf-dropzone').classList.remove('hidden');
+       document.getElementById('pdf-input').value = "";
+       showToast("リセットしました");
+    }
+    async function createPdfFromPages(pagesList) {
+        const newPdf = await PDFLib.PDFDocument.create();
+        for (let p of pagesList) {
+            const srcDoc = pdfDocs[p.docIndex];
+            const [copiedPage] = await newPdf.copyPages(srcDoc, [p.pageIndex]);
+            const existingRotation = copiedPage.getRotation().angle;
+            copiedPage.setRotation(PDFLib.degrees(existingRotation + p.rotation));
+            newPdf.addPage(copiedPage);
+        }
+        return await newPdf.save();
+    }
+    function downloadFile(url, name) {
+        const a = document.createElement('a'); a.href = url; a.download = name; a.click();
+    }
+
+    // === EXIF FIX ===
+    document.getElementById('exif-input').addEventListener('change', (e) => { if(e.target.files[0]) processExifFile(e.target.files[0]); });
+    async function processExifFile(file) {
+      toggleLoading(true);
+      try {
+        let finalDataUrl = "";
+        const lowerName = file.name.toLowerCase();
+        if (file.type === 'image/png' || file.type === 'image/jpeg' || lowerName.endsWith('.jpg') || lowerName.endsWith('.jpeg') || lowerName.endsWith('.png')) {
+             const mimeType = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
+             finalDataUrl = await reEncodeImage(file, mimeType);
+        } else if (lowerName.endsWith('.heic') || lowerName.endsWith('.heif')) {
+             const convertedBlob = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.9 });
+             const blob = Array.isArray(convertedBlob) ? convertedBlob[0] : convertedBlob;
+             const tempFile = new File([blob], "temp.jpg", { type: "image/jpeg" });
+             finalDataUrl = await reEncodeImage(tempFile, 'image/jpeg');
+        } else {
+             throw new Error("Unsupported file type");
+        }
+        document.getElementById('exif-download').href = finalDataUrl;
+        document.getElementById('exif-download').download = "clean_" + file.name.replace(/\.[^/.]+$/, "") + ".jpg"; // 拡張子調整
+        document.getElementById('exif-preview').src = finalDataUrl;
+        document.getElementById('exif-dropzone').classList.add('hidden');
+        document.getElementById('exif-result').classList.remove('hidden');
+        playConfetti();
+        showToast("完了しました");
+      } catch (err) { console.error(err); showToast("処理エラー"); } finally { toggleLoading(false); }
+    }
+    function resetExif() {
+      document.getElementById('exif-result').classList.add('hidden');
+      document.getElementById('exif-dropzone').classList.remove('hidden');
+      document.getElementById('exif-preview').src = "";
+    }
+    
+    document.getElementById('palette-input').addEventListener('change', (e) => { if(e.target.files[0]) processPaletteFile(e.target.files[0]); });
+    const colorThief = new ColorThief();
+    function processPaletteFile(file) {
+      const reader = new FileReader();
+      reader.onload = function(event) {
+        document.getElementById('palette-preview').src = event.target.result;
+        document.getElementById('palette-dropzone').classList.add('hidden'); 
+        document.getElementById('palette-result-area').classList.remove('hidden');
+        setTimeout(() => {
+            const colors = colorThief.getPalette(document.getElementById('palette-preview'), 6);
+            const div = document.getElementById('palette-colors');
+            div.innerHTML = '';
+            colors.forEach(c => {
+                const hex = "#" + ((1 << 24) + (c[0] << 16) + (c[1] << 8) + c[2]).toString(16).slice(1).toUpperCase();
+                div.innerHTML += `<div class="w-16 h-16 rounded-lg cursor-pointer flex items-center justify-center text-xs font-bold text-white shadow-sm hover:scale-110 transition-transform" style="background-color:rgb(${c[0]},${c[1]},${c[2]})" onclick="copyTextToClipboard('${hex}')">${hex}</div>`;
+            });
+            playConfetti();
+        }, 100);
+      }
+      reader.readAsDataURL(file);
+    }
+    function resetPalette() {
+        document.getElementById('palette-result-area').classList.add('hidden');
+        document.getElementById('palette-dropzone').classList.remove('hidden');
+        document.getElementById('palette-input').value = "";
+        document.getElementById('palette-input').classList.remove('hidden');
+    }
+
+    document.getElementById('resize-input').addEventListener('change', (e) => { if(e.target.files[0]) processResizeFile(e.target.files[0]); });
+    function processResizeFile(file) {
+      selectedResizeFile = file;
+      document.getElementById('resize-placeholder').classList.add('hidden');
+      document.getElementById('resize-ui').classList.remove('hidden');
+      document.getElementById('resize-preview').src = URL.createObjectURL(file);
+      
+      const nameEl = document.getElementById('resize-filename');
+      if (nameEl) nameEl.innerText = file.name;
+    }
+    function processResize() {
+      if (!selectedResizeFile) return;
+      const targetWidth = parseInt(document.getElementById('resize-width').value);
+      const reader = new FileReader();
+      reader.onload = function(event) {
+        const img = new Image();
+        img.onload = function() {
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          const scaleFactor = targetWidth / img.width;
+          canvas.width = targetWidth;
+          canvas.height = img.height * scaleFactor;
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          document.getElementById('resize-download').href = canvas.toDataURL('image/png');
+          document.getElementById('resize-result').classList.remove('hidden');
+          playConfetti();
+          showToast("完了しました");
+        };
+        img.src = event.target.result;
+      };
+      reader.readAsDataURL(selectedResizeFile);
+    }
+    function resetResize() {
+      selectedResizeFile = null;
+      document.getElementById('resize-placeholder').classList.remove('hidden');
+      document.getElementById('resize-ui').classList.add('hidden');
+      document.getElementById('resize-result').classList.add('hidden');
+      document.getElementById('resize-input').value = "";
+      document.getElementById('resize-input').classList.remove('hidden');
+    }
+    function generateQR() {
+      const text = document.getElementById('qr-text').value;
+      const area = document.getElementById('qr-code-area');
+      area.innerHTML = "";
+      if(!text) { area.innerHTML = '<span class="text-slate-300 text-xs">テキストを入力してください</span>'; return; }
+      new QRCode(area, { text: text, width: 160, height: 160, colorDark : "#1D1D1F", colorLight : "#ffffff", correctLevel : QRCode.CorrectLevel.H });
+    }
+    function generatePass() {
+      const len = document.getElementById('pass-len').value;
+      const useNum = document.getElementById('pass-num').checked;
+      const useSym = document.getElementById('pass-sym').checked;
+      const letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+      const numbers = "0123456789";
+      const symbols = "!@#$%^&*()_+-=[]{}|;:,.<>?";
+      let chars = letters;
+      if(useNum) chars += numbers;
+      if(useSym) chars += symbols;
+      let pass = "";
+      for(let i=0; i<len; i++) pass += chars.charAt(Math.floor(Math.random() * chars.length));
+      document.getElementById('pass-display').innerText = pass;
+    }
+    function copyPass() {
+      const pass = document.getElementById('pass-display').innerText;
+      if(!pass) return;
+      copyTextToClipboard(pass);
+    }
+    generatePass(); 
+
+    // === Game Logic (2048) ===
+    let gameBoard = [];
+    let gameScore = 0;
+    let gameBest = localStorage.getItem('game2048_best') || 0;
+    document.getElementById('game-best').innerText = gameBest;
+
+    function initGameIfNotStarted() {
+       if(gameBoard.length === 0) initGame();
+    }
+    function initGame() {
+       gameBoard = Array(16).fill(0);
+       gameScore = 0;
+       gameWon = false;
+       document.getElementById('game-score').innerText = gameScore;
+       document.getElementById('game-message').classList.add('hidden');
+       addNewTile();
+       addNewTile();
+       drawBoard();
+    }
+    function addNewTile() {
+       let emptyCells = [];
+       for(let i=0; i<16; i++) {
+          if(gameBoard[i] === 0) emptyCells.push(i);
+       }
+       if(emptyCells.length > 0) {
+          const randIdx = emptyCells[Math.floor(Math.random() * emptyCells.length)];
+          gameBoard[randIdx] = Math.random() < 0.9 ? 2 : 4;
+       }
+    }
+    function drawBoard() {
+       const container = document.getElementById('game-container');
+       container.innerHTML = '';
+       for(let i=0; i<16; i++) {
+          const val = gameBoard[i];
+          const cell = document.createElement('div');
+          cell.className = `game-cell ${val > 0 ? 'tile-'+val : ''}`;
+          cell.innerText = val > 0 ? val : '';
+          container.appendChild(cell);
+       }
+    }
+    function handleGameInput(key) {
+       if(!document.getElementById('game-message').classList.contains('hidden')) return;
+       let moved = false;
+       if(key === 'ArrowUp') moved = moveUp();
+       else if(key === 'ArrowDown') moved = moveDown();
+       else if(key === 'ArrowLeft') moved = moveLeft();
+       else if(key === 'ArrowRight') moved = moveRight();
+       if(moved) {
+          addNewTile();
+          drawBoard();
+          if(gameScore > gameBest) {
+             gameBest = gameScore;
+             localStorage.setItem('game2048_best', gameBest);
+             document.getElementById('game-best').innerText = gameBest;
+          }
+          checkGameState();
+       }
+    }
+    function checkGameState() {
+        if (!gameWon && gameBoard.includes(2048)) {
+            gameWon = true;
+            document.getElementById('game-message-text').innerText = "You Win! 🎉";
+            document.getElementById('game-message').innerHTML = '<p class="text-4xl font-bold text-white mb-6">You Win!</p><div class="flex gap-4"><button onclick="continueGame()" class="bg-indigo-500 text-white px-6 py-2 rounded-lg font-bold hover:bg-indigo-600 transition-colors shadow-lg">続ける</button><button onclick="initGame()" class="bg-slate-700 text-white px-6 py-2 rounded-lg font-bold hover:bg-slate-800 transition-colors shadow-lg">最初から</button></div>';
+            document.getElementById('game-message').classList.remove('hidden');
+            playConfetti();
+        } else if (!canMove()) {
+            document.getElementById('game-message-text').innerText = "Game Over";
+             document.getElementById('game-message').innerHTML = '<p class="text-4xl font-bold text-white mb-6">Game Over</p><button onclick="initGame()" class="bg-indigo-500 text-white px-8 py-3 rounded-xl font-bold hover:bg-indigo-600 transition-colors shadow-lg">Try Again</button>';
+            document.getElementById('game-message').classList.remove('hidden');
+        }
+    }
+    function continueGame() {
+        document.getElementById('game-message').classList.add('hidden');
+    }
+    function canMove() {
+        if (gameBoard.includes(0)) return true;
+        for (let i = 0; i < 4; i++) {
+            for (let j = 0; j < 4; j++) {
+                let current = gameBoard[i * 4 + j];
+                if (j < 3 && current === gameBoard[i * 4 + j + 1]) return true;
+                if (i < 3 && current === gameBoard[(i + 1) * 4 + j]) return true;
+            }
+        }
+        return false;
+    }
+    function slide(line) {
+       let arr = line.filter(x => x !== 0);
+       for(let i=0; i<arr.length-1; i++) {
+          if(arr[i] === arr[i+1]) {
+             arr[i] *= 2;
+             gameScore += arr[i];
+             arr[i+1] = 0;
+          }
+       }
+       arr = arr.filter(x => x !== 0);
+       while(arr.length < 4) arr.push(0);
+       return arr;
+    }
+    function moveLeft() {
+       let moved = false;
+       for(let r=0; r<4; r++) {
+          let row = [gameBoard[r*4], gameBoard[r*4+1], gameBoard[r*4+2], gameBoard[r*4+3]];
+          let newRow = slide(row);
+          if(newRow.toString() !== row.toString()) moved = true;
+          for(let c=0; c<4; c++) gameBoard[r*4+c] = newRow[c];
+       }
+       return moved;
+    }
+    function moveRight() {
+       let moved = false;
+       for(let r=0; r<4; r++) {
+          let row = [gameBoard[r*4], gameBoard[r*4+1], gameBoard[r*4+2], gameBoard[r*4+3]];
+          let newRow = slide(row.reverse()).reverse();
+          if(newRow.toString() !== row.toString()) moved = true;
+          for(let c=0; c<4; c++) gameBoard[r*4+c] = newRow[c];
+       }
+       return moved;
+    }
+    function moveUp() {
+       let moved = false;
+       for(let c=0; c<4; c++) {
+          let col = [gameBoard[c], gameBoard[c+4], gameBoard[c+8], gameBoard[c+12]];
+          let newCol = slide(col);
+          if(newCol.toString() !== col.toString()) moved = true;
+          for(let r=0; r<4; r++) gameBoard[r*4+c] = newCol[r];
+       }
+       return moved;
+    }
+    function moveDown() {
+       let moved = false;
+       for(let c=0; c<4; c++) {
+          let col = [gameBoard[c], gameBoard[c+4], gameBoard[c+8], gameBoard[c+12]];
+          let newCol = slide(col.reverse()).reverse();
+          if(newCol.toString() !== col.toString()) moved = true;
+          for(let r=0; r<4; r++) gameBoard[r*4+c] = newCol[r];
+       }
+       return moved;
+    }
+    function showGameRule() {
+        const modal = document.getElementById('game-rule-modal');
+        modal.classList.remove('hidden');
+    }
+    function closeGameRule(e) {
+        if (!e || e.target.id === 'game-rule-modal' || e.target.tagName === 'BUTTON' || e.target.closest('button')) {
+            document.getElementById('game-rule-modal').classList.add('hidden');
+        }
+    }
+    let touchStartX = 0;
+    let touchStartY = 0;
+    const gameContainer = document.getElementById('game-container');
+    gameContainer.addEventListener('touchstart', function(e) {
+        touchStartX = e.changedTouches[0].screenX;
+        touchStartY = e.changedTouches[0].screenY;
+        e.preventDefault(); 
+    }, {passive: false});
+    gameContainer.addEventListener('touchend', function(e) {
+        let touchEndX = e.changedTouches[0].screenX;
+        let touchEndY = e.changedTouches[0].screenY;
+        let dx = touchEndX - touchStartX;
+        let dy = touchEndY - touchStartY;
+        if (Math.abs(dx) > Math.abs(dy)) {
+            if (Math.abs(dx) > 30) { if (dx > 0) handleGameInput('ArrowRight'); else handleGameInput('ArrowLeft'); }
+        } else {
+             if (Math.abs(dy) > 30) { if (dy > 0) handleGameInput('ArrowDown'); else handleGameInput('ArrowUp'); }
+        }
+        e.preventDefault();
+    }, {passive: false});
+    document.addEventListener('keydown', (e) => {
+       if(currentTab === 'game' && ['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)) {
+          e.preventDefault();
+          handleGameInput(e.key);
+       }
+    });
+
+    // Omikuji
+    const OMIKUJI_DATA = [{rank:"大吉", color:"text-rose-500"}, {rank:"吉", color:"text-blue-500"}, {rank:"中吉", color:"text-orange-500"}];
+    function drawOmikuji() {
+        const res = OMIKUJI_DATA[Math.floor(Math.random()*OMIKUJI_DATA.length)];
+        document.getElementById('omikuji-rank').innerText = res.rank;
+        document.getElementById('omikuji-rank').className = `text-5xl font-black mb-4 ${res.color}`;
+        document.getElementById('omikuji-start').classList.add('hidden');
+        document.getElementById('omikuji-result').classList.remove('hidden');
+        document.getElementById('omikuji-result').classList.add('flex');
+        playConfetti();
+    }
+    function resetOmikuji() {
+        document.getElementById('omikuji-result').classList.add('hidden');
+        document.getElementById('omikuji-result').classList.remove('flex');
+        document.getElementById('omikuji-start').classList.remove('hidden');
+    }
+
+    // === Desktop Golf Logic (Revised) ===
+    function toggleGolfUi() {
+        const ui = document.getElementById('golf-ui');
+        const full = document.getElementById('golf-ui-full');
+        const mini = document.getElementById('golf-ui-mini');
+        const icon = document.getElementById('golf-toggle-icon');
+
+        if (ui.classList.contains('w-64')) {
+            ui.classList.remove('w-64', 'p-6');
+            ui.classList.add('w-auto', 'p-2'); // さらに小さく
+            full.classList.add('hidden');
+            mini.classList.remove('hidden');
+            icon.innerText = 'expand_more';
+        } else {
+            ui.classList.remove('w-auto', 'p-2');
+            ui.classList.add('w-64', 'p-6');
+            full.classList.remove('hidden');
+            mini.classList.add('hidden');
+            icon.innerText = 'expand_less';
+        }
+    }
+    
+    function showGolfRule() {
+        const modal = document.getElementById('golf-rule-modal');
+        modal.classList.remove('hidden');
+    }
+    function closeGolfRule(e) {
+        if (!e || e.target.id === 'golf-rule-modal' || e.target.closest('button')) {
+            document.getElementById('golf-rule-modal').classList.add('hidden');
+        }
+    }
+
+    const golfGame = {
+        isInitialized: false,
+        level: 1,
+        maxLevel: 20,
+        shots: 0,
+        totalScore: 0,
+        isDragging: false,
+        dragStart: { x: 0, y: 0 },
+        dragCurrent: { x: 0, y: 0 },
+        isBossMode: false,
+        particles: [],
+        friction: 0.98, // 摩擦を少し減らす
+        wallBounce: 0.8, // 反射係数を上げる
+        powerScale: 0.14,
+        maxPower: 25,
+        colors: {
+            folder: '#00C7FC',
+            folderDark: '#0097D8',
+            trashBody: '#E5E5EA',
+            trashRim: '#C7C7CC',
+            windowBg: 'rgba(255, 255, 255, 0.9)',
+            windowShadow: 'rgba(0,0,0,0.15)',
+            wall: 'rgba(255, 255, 255, 0.4)',
+            wallBorder: 'rgba(255, 255, 255, 0.6)'
+        },
+        player: { x: 0, y: 0, vx: 0, vy: 0, radius: 22 },
+        goal: { x: 0, y: 0, w: 56, h: 66, par: 3 },
+        obstacles: [],
+        rafId: null,
+
+        init() {
+            if (this.isInitialized) return;
+            this.canvas = document.getElementById('golf-canvas');
+            if(!this.canvas) return;
+            this.ctx = this.canvas.getContext('2d');
+            
+            this.canvas.addEventListener('mousedown', this.onMouseDown.bind(this));
+            this.canvas.addEventListener('mousemove', this.onMouseMove.bind(this));
+            window.addEventListener('mouseup', this.onMouseUp.bind(this)); 
+            document.addEventListener('keydown', this.onKeyDown.bind(this));
+            window.addEventListener('resize', this.resize.bind(this));
+            
+            this.isInitialized = true;
+            this.start();
+        },
+
+        start() {
+            this.resize();
+            if(this.player.x === 0 && this.player.y === 0) {
+               this.loadLevel(this.level);
+            }
+            if (!this.rafId) {
+                this.update();
+            }
+        },
+
+        stop() {
+            if (this.rafId) {
+                cancelAnimationFrame(this.rafId);
+                this.rafId = null;
+            }
+        },
+
+        resize() {
+            const container = document.getElementById('view-golf');
+            if(container) {
+                // コンテナのサイズを取得。非表示時はwindowサイズをフォールバック
+                const w = container.clientWidth || window.innerWidth;
+                const h = container.clientHeight || window.innerHeight;
+                if(w && h) {
+                    this.canvas.width = w;
+                    this.canvas.height = h;
+                }
+            }
+        },
+
+        loadLevel(lvl) {
+            this.level = lvl;
+            this.shots = 0;
+            this.player.vx = 0;
+            this.player.vy = 0;
+            this.particles = [];
+            
+            const w = this.canvas.width || 800; 
+            const h = this.canvas.height || 600;
+            const cx = w / 2;
+            const cy = h / 2;
+            this.obstacles = [];
+
+            switch(lvl) {
+                case 1:
+                    this.player.x = w * 0.2; this.player.y = cy;
+                    this.goal.x = w * 0.8; this.goal.y = cy - 30;
+                    this.goal.par = 2;
+                    this.obstacles.push({ x: cx - 10, y: cy - 100, w: 20, h: 200, type: 'wall' });
+                    break;
+                case 2:
+                     this.player.x = 100; this.player.y = h - 150;
+                     this.goal.x = w - 100; this.goal.y = 150;
+                     this.goal.par = 3;
+                     this.obstacles.push({ x: w * 0.4, y: 0, w: 40, h: h * 0.6, type: 'wall' });
+                     this.obstacles.push({ x: w * 0.6, y: h * 0.4, w: 40, h: h * 0.6, type: 'wall' });
+                     break;
+                 // Level 3-5: Simple patterns
+                case 3:
+                     this.player.x = 100; this.player.y = cy;
+                     this.goal.x = w - 100; this.goal.y = cy;
+                     this.goal.par = 3;
+                     // 中央に窓
+                     this.obstacles.push({ x: cx - 50, y: cy - 100, w: 100, h: 200, type: 'window', title: 'Finder' });
+                     break;
+                case 4:
+                     this.player.x = 100; this.player.y = h - 100;
+                     this.goal.x = w - 100; this.goal.y = 100;
+                     this.goal.par = 4;
+                     // 斜めの壁配置
+                     this.obstacles.push({ x: w*0.3, y: h*0.2, w: 20, h: h*0.6, type: 'wall' });
+                     this.obstacles.push({ x: w*0.6, y: h*0.2, w: 20, h: h*0.6, type: 'wall' });
+                     break;
+                // High level difficulty
+                case 6:
+                     this.player.x = 100; this.player.y = cy;
+                     this.goal.x = w - 100; this.goal.y = cy;
+                     this.goal.par = 4;
+                     this.obstacles.push({ x: cx - 20, y: 100, w: 40, h: 80, type: 'wall', moveY: 4, rangeY: [50, h-150] });
+                     break;
+                case 7:
+                     this.player.x = 100; this.player.y = h - 100;
+                     this.goal.x = w - 100; this.goal.y = 100;
+                     this.goal.par = 5;
+                     this.obstacles.push({ x: w*0.3, y: 0, w: 20, h: h*0.5, type: 'wall', moveY: 2, rangeY: [0, h*0.5] });
+                     this.obstacles.push({ x: w*0.6, y: h*0.5, w: 20, h: h*0.5, type: 'wall', moveY: -2, rangeY: [0, h*0.5] });
+                     break;
+                
+                default:
+                    // Random generation
+                    this.player.x = 100; this.player.y = 100;
+                    this.goal.x = w - 100; this.goal.y = h - 100;
+                    this.goal.par = 4;
+                    for(let i=0; i<3 + Math.floor(lvl/5); i++) {
+                        this.obstacles.push({
+                            x: Math.random() * (w - 200) + 100,
+                            y: Math.random() * (h - 200) + 100,
+                            w: 80, h: 80,
+                            type: Math.random() > 0.5 ? 'wall' : 'window',
+                            title: 'App',
+                            moveX: Math.random() > 0.7 ? 2 : 0,
+                            rangeX: [100, w-100]
+                        });
+                    }
+            }
+            
+            // UIエリア除外: ゴールが右上にある場合は位置をずらす
+            if (this.goal.x > w - 300 && this.goal.y < 300) {
+                this.goal.y = 350; // ずらす
+            }
+            
+            this.updateUI();
+        },
+        
+        resetLevel() { this.loadLevel(this.level); },
+
+        updateUI() {
+            const elLvl = document.getElementById('golf-level');
+            if(elLvl) elLvl.innerText = `${this.level}`;
+            const elShots = document.getElementById('golf-shots');
+            if(elShots) elShots.innerText = this.shots;
+            
+            // ミニ表示用
+            const elShotsMini = document.getElementById('golf-shots-mini');
+            if(elShotsMini) elShotsMini.innerText = this.shots;
+
+            const elPar = document.getElementById('golf-par');
+            if(elPar) elPar.innerText = this.goal.par;
+            const elScore = document.getElementById('golf-score');
+            if(elScore) elScore.innerText = this.totalScore;
+        },
+
+        getMousePos(e) {
+            const rect = this.canvas.getBoundingClientRect();
+            return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+        },
+
+        onMouseDown(e) {
+            if (this.isBossMode || currentTab !== 'golf') return;
+            if (Math.abs(this.player.vx) > 0.1 || Math.abs(this.player.vy) > 0.1) return;
+            const pos = this.getMousePos(e);
+            if (Math.hypot(pos.x - this.player.x, pos.y - this.player.y) < 60) {
+                this.isDragging = true;
+                this.dragStart = pos;
+                this.dragCurrent = pos;
+            }
+        },
+
+        onMouseMove(e) {
+            if (currentTab !== 'golf') return;
+            const pos = this.getMousePos(e);
+            const ui = document.getElementById('golf-ui');
+            if (ui && pos.x > this.canvas.width - 300 && pos.y < 300) {
+                ui.style.opacity = '0.2';
+            } else if (ui) {
+                ui.style.opacity = '1.0';
+            }
+            if (this.isDragging) {
+                this.dragCurrent = pos;
+            }
+        },
+
+        onMouseUp(e) {
+            if (this.isDragging) {
+                this.isDragging = false;
+                let dx = this.dragStart.x - this.dragCurrent.x;
+                let dy = this.dragStart.y - this.dragCurrent.y;
+                let power = Math.hypot(dx, dy) * this.powerScale;
+                if (power > this.maxPower) {
+                    let angle = Math.atan2(dy, dx);
+                    dx = Math.cos(angle) * (this.maxPower / this.powerScale);
+                    dy = Math.sin(angle) * (this.maxPower / this.powerScale);
+                }
+                if (power > 1) {
+                    this.player.vx = dx * this.powerScale;
+                    this.player.vy = dy * this.powerScale;
+                    this.shots++;
+                    this.updateUI();
+                }
+            }
+        },
+
+        onKeyDown(e) {
+            if (currentTab === 'golf' && e.key === 'Escape') {
+                this.isBossMode = !this.isBossMode;
+                const boss = document.getElementById('golf-boss-mode');
+                const ui = document.getElementById('golf-ui');
+                if(boss) boss.style.display = this.isBossMode ? 'flex' : 'none';
+                if(ui) ui.style.display = this.isBossMode ? 'none' : 'block';
+            }
+        },
+
+        roundRect(ctx, x, y, w, h, r) { if (w < 2 * r) r = w / 2; if (h < 2 * r) r = h / 2; ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); },
+        drawFolder(x, y) { const ctx = this.ctx; const w = 48; const h = 38; ctx.save(); ctx.translate(x, y); ctx.shadowColor = 'rgba(0,0,0,0.2)'; ctx.shadowBlur = 10; ctx.shadowOffsetY = 5; ctx.fillStyle = this.colors.folderDark; ctx.beginPath(); ctx.moveTo(-w/2, -h/2 + 5); ctx.lineTo(0, -h/2 + 5); ctx.lineTo(4, -h/2); ctx.lineTo(w/2, -h/2); ctx.lineTo(w/2, h/2); ctx.lineTo(-w/2, h/2); ctx.closePath(); ctx.fill(); const grad = ctx.createLinearGradient(0, -h/2, 0, h/2); grad.addColorStop(0, '#5AC8FA'); grad.addColorStop(1, '#007AFF'); ctx.fillStyle = grad; this.roundRect(ctx, -w/2, -h/2 + 6, w, h - 6, 4); ctx.fill(); ctx.fillStyle = 'rgba(255,255,255,0.3)'; ctx.fillRect(-10, -5, 20, 2); ctx.fillRect(-10, 0, 20, 2); ctx.fillRect(-10, 5, 15, 2); ctx.restore(); },
+        drawTrash(x, y, w, h) { const ctx = this.ctx; ctx.save(); ctx.fillStyle = 'rgba(0,0,0,0.15)'; ctx.beginPath(); ctx.ellipse(x + w/2, y + h - 5, w/2, 6, 0, 0, Math.PI * 2); ctx.fill(); const grad = ctx.createLinearGradient(x, y, x + w, y); grad.addColorStop(0, '#d1d1d6'); grad.addColorStop(0.5, '#f2f2f7'); grad.addColorStop(1, '#aeaeb2'); ctx.fillStyle = grad; ctx.beginPath(); ctx.moveTo(x + 5, y); ctx.lineTo(x + w - 5, y); ctx.lineTo(x + w - 10, y + h); ctx.lineTo(x + 10, y + h); ctx.closePath(); ctx.fill(); ctx.fillStyle = 'rgba(0,0,0,0.1)'; for(let i=0; i<5; i++) ctx.fillRect(x + 10, y + 10 + i*10, w - 20, 1); for(let i=0; i<4; i++) ctx.fillRect(x + 15 + i*10, y + 10, 1, h - 20); ctx.fillStyle = '#e5e5ea'; ctx.beginPath(); ctx.ellipse(x + w/2, y, w/2, 5, 0, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = '#c7c7cc'; ctx.stroke(); ctx.restore(); },
+        drawWindow(obj) { const ctx = this.ctx; ctx.save(); ctx.shadowColor = this.colors.windowShadow; ctx.shadowBlur = 25; ctx.shadowOffsetY = 15; ctx.fillStyle = this.colors.windowBg; this.roundRect(ctx, obj.x, obj.y, obj.w, obj.h, 12); ctx.fill(); ctx.fillStyle = '#f5f5f7'; ctx.beginPath(); ctx.roundRect(obj.x, obj.y, obj.w, 32, [12, 12, 0, 0]); ctx.fill(); ctx.strokeStyle = 'rgba(0,0,0,0.05)'; ctx.lineWidth = 1; this.roundRect(ctx, obj.x, obj.y, obj.w, obj.h, 12); ctx.stroke(); ctx.fillStyle = '#FF5F57'; ctx.beginPath(); ctx.arc(obj.x + 18, obj.y + 16, 6, 0, Math.PI*2); ctx.fill(); ctx.fillStyle = '#FEBC2E'; ctx.beginPath(); ctx.arc(obj.x + 38, obj.y + 16, 6, 0, Math.PI*2); ctx.fill(); ctx.fillStyle = '#28C840'; ctx.beginPath(); ctx.arc(obj.x + 58, obj.y + 16, 6, 0, Math.PI*2); ctx.fill(); ctx.fillStyle = '#3a3a3c'; ctx.font = '600 12px -apple-system'; ctx.textAlign = 'center'; ctx.fillText(obj.title || 'App', obj.x + obj.w/2, obj.y + 20); ctx.restore(); },
+        drawWall(obj) { const ctx = this.ctx; ctx.save(); ctx.fillStyle = this.colors.wall; ctx.strokeStyle = this.colors.wallBorder; ctx.lineWidth = 1; this.roundRect(ctx, obj.x, obj.y, obj.w, obj.h, 8); ctx.fill(); ctx.stroke(); const grad = ctx.createLinearGradient(obj.x, obj.y, obj.x + obj.w, obj.y + obj.h); grad.addColorStop(0, 'rgba(255,255,255,0.4)'); grad.addColorStop(1, 'rgba(255,255,255,0.1)'); ctx.fillStyle = grad; ctx.fill(); ctx.restore(); },
+
+        createParticles(x, y, color) { for(let i=0; i<15; i++) { this.particles.push({ x: x, y: y, vx: (Math.random() - 0.5) * 8, vy: (Math.random() - 0.5) * 8, life: 1.0, color: color }); } },
+
+        update() {
+            if(currentTab !== 'golf') return;
+
+            this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+
+            // Update Obstacles
+            this.obstacles.forEach(obs => {
+                if (obs.moveX && obs.rangeX) {
+                    obs.x += obs.moveX;
+                    if (obs.x < obs.rangeX[0] || obs.x > obs.rangeX[1]) obs.moveX *= -1;
+                }
+                if (obs.moveY && obs.rangeY) {
+                    obs.y += obs.moveY;
+                    if (obs.y < obs.rangeY[0] || obs.y > obs.rangeY[1]) obs.moveY *= -1;
+                }
+            });
+
+            this.drawTrash(this.goal.x, this.goal.y, this.goal.w, this.goal.h);
+            
+            this.obstacles.forEach(obs => {
+                if (obs.type === 'window') this.drawWindow(obs);
+                else this.drawWall(obs);
+            });
+
+            if (!this.isDragging) {
+                this.player.x += this.player.vx;
+                this.player.y += this.player.vy;
+                this.player.vx *= this.friction;
+                this.player.vy *= this.friction;
+                if(Math.abs(this.player.vx) < 0.05) this.player.vx = 0;
+                if(Math.abs(this.player.vy) < 0.05) this.player.vy = 0;
+            }
+
+            // Wall Collisions
+            if (this.player.x < this.player.radius) { this.player.x = this.player.radius; this.player.vx *= -this.wallBounce; }
+            if (this.player.x > this.canvas.width - this.player.radius) { this.player.x = this.canvas.width - this.player.radius; this.player.vx *= -this.wallBounce; }
+            if (this.player.y < this.player.radius) { this.player.y = this.player.radius; this.player.vy *= -this.wallBounce; }
+            if (this.player.y > this.canvas.height - this.player.radius) { this.player.y = this.canvas.height - this.player.radius; this.player.vy *= -this.wallBounce; }
+
+            // Obstacle Collisions (Fixed: Push out logic)
+            this.obstacles.forEach(obs => {
+                let testX = this.player.x;
+                let testY = this.player.y;
+                if (this.player.x < obs.x) testX = obs.x;
+                else if (this.player.x > obs.x + obs.w) testX = obs.x + obs.w;
+                if (this.player.y < obs.y) testY = obs.y;
+                else if (this.player.y > obs.y + obs.h) testY = obs.y + obs.h;
+                
+                let distX = this.player.x - testX;
+                let distY = this.player.y - testY;
+                let distance = Math.sqrt(distX*distX + distY*distY);
+                
+                if (distance <= this.player.radius) {
+                    // Collision detected
+                    if (Math.abs(distX) > Math.abs(distY)) {
+                        this.player.vx *= -this.wallBounce;
+                        // Push out horizontally
+                        if (distX > 0) this.player.x = testX + this.player.radius + 1;
+                        else this.player.x = testX - this.player.radius - 1;
+                    } else {
+                        this.player.vy *= -this.wallBounce;
+                        // Push out vertically
+                        if (distY > 0) this.player.y = testY + this.player.radius + 1;
+                        else this.player.y = testY - this.player.radius - 1;
+                    }
+                }
+            });
+
+            // Goal Check
+            if (this.player.x > this.goal.x && this.player.x < this.goal.x + this.goal.w &&
+                this.player.y > this.goal.y && this.player.y < this.goal.y + this.goal.h) {
+                if (Math.abs(this.player.vx) + Math.abs(this.player.vy) < 20) {
+                    this.createParticles(this.player.x, this.player.y, this.colors.folder);
+                    let diff = this.shots - this.goal.par;
+                    let pts = 100 - (diff * 20);
+                    if (pts < 10) pts = 10;
+                    this.totalScore += pts;
+                    this.level++;
+                    this.loadLevel(this.level);
+                    showToast("ホールイン！");
+                }
+            }
+
+            if (this.player.x > -500) this.drawFolder(this.player.x, this.player.y);
+
+            if (this.isDragging) {
+                this.ctx.beginPath();
+                this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+                this.ctx.setLineDash([6, 6]);
+                this.ctx.lineWidth = 3;
+                this.ctx.moveTo(this.player.x, this.player.y);
+                this.ctx.lineTo(this.dragCurrent.x, this.dragCurrent.y);
+                this.ctx.stroke();
+                this.ctx.setLineDash([]);
+            }
+
+            this.particles.forEach((p, index) => {
+                p.x += p.vx; p.y += p.vy; p.life -= 0.04;
+                this.ctx.fillStyle = p.color; this.ctx.globalAlpha = p.life; this.ctx.beginPath(); this.ctx.arc(p.x, p.y, 4, 0, Math.PI*2); this.ctx.fill(); this.ctx.globalAlpha = 1.0;
+                if(p.life <= 0) this.particles.splice(index, 1);
+            });
+
+            this.rafId = requestAnimationFrame(this.update.bind(this));
+        }
+    };
+
+    // Sortable Init
+    new Sortable(document.getElementById('pdf-pages-container'), { animation: 150, ghostClass: 'sortable-ghost', dragClass: 'sortable-drag' });
+  </script>
+</body>
+</html>
